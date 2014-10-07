@@ -8,6 +8,7 @@ import qualified Text.Parsec.Token as P
 
 import ParseSyntax
 import IndentParser
+import LanguageDef
 
 import Control.Monad
 import Control.Monad.Identity
@@ -20,53 +21,58 @@ import System.IO.Unsafe
 
 parserI = parseI
 
+readU = unsafePerformIO . readFile
 
-myTokens :: (Stream String m t) => GenLanguageDef String u m
-myTokens = P.LanguageDef 
-  { P.commentStart   = "{-"
-  , P.commentEnd     = "-}"
-  , P.commentLine    = "--"
-  , P.nestedComments = True
-  , P.identStart     = letter
-  , P.identLetter	 = alphaNum <|> oneOf "_'"
-  , P.opStart	 = P.opLetter myTokens 
-  , P.opLetter	 = oneOf ":!#$%&*+./<=>?@\\^|-~"
-  , P.reservedOpNames= ["=", "->"]
-  , P.reservedNames  = ["case", "of"]
-  , P.caseSensitive  = True
-  }
+def :: ParsecI Def
+def = do
+  (v : vs) <- many1 identifier
+  reserved "="
+  reserved "{"
+  e <- expr
+  reserved "}"
+  return (Def v vs e)
+
+parseFile :: ParsecI [Def]
+parseFile =  whiteSpace >> many1 def
+
+expr :: ParsecI Exp
+expr =  caseExpr
+    <|> lamExpr
+    <|> appExpr    
+ 
+innerExpr :: ParsecI Exp
+innerExpr = parens expr 
+         <|> varExpr
+
+varExpr :: ParsecI Exp
+varExpr = fmap Var identifier 
+
+lamExpr :: ParsecI Exp
+lamExpr = do
+  reserved "\\"
+  vs <- many1 identifier
+  reserved "->"
+  e <- expr 
+  return (Lam vs e) 
 
 caseExpr :: ParsecI Exp
 caseExpr = do
   reserved "case"
-  subj <- basicExpr
+  subj <- expr
   reserved "of"
   alts <- block altPatt 
   return $ Case subj alts 
 
-readU = unsafePerformIO . readFile
+appExpr :: ParsecI Exp
+appExpr = do 
+  (e : es) <- many1 innerExpr 
+  return (Ap e es)
 
 altPatt :: ParsecI Alt
 altPatt = do
   (c : vs) <- many1 identifier
   reserved "->" 
-  e <- basicExpr
+  e <- expr 
+  reserved ";"
   return (Alt c vs e)
 
-
-
---Alt (VarID 0 "") patt
-  
-basicExpr :: ParsecI Exp
-basicExpr = do 
-  v <- identifier 
-  return $ Var v
-
-lexer = P.makeTokenParser myTokens
-
-parens = P.parens lexer
-braces = P.braces lexer
-identifier = P.identifier lexer
-
-reserved :: String -> ParsecI ()
-reserved = P.reserved lexer

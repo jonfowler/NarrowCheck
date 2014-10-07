@@ -1,3 +1,6 @@
-case x of   
-  a c d -> q
-  b -> r
+v = { case x of   
+  a c d -> q;
+  b -> r;
+}
+
+t = { v x }
