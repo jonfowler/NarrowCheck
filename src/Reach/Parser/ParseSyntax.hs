@@ -1,5 +1,4 @@
-module ParseSyntax where
-
+module Reach.Parser.ParseSyntax where
 
 data Def = Def VarID [VarID] Exp
   deriving (Show)

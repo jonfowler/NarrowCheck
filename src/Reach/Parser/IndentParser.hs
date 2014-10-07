@@ -1,4 +1,4 @@
-module IndentParser where
+module Reach.Parser.IndentParser where
 
 import Text.Parsec
 import Text.Parsec.Pos

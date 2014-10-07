@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Parser where
+module Reach.Parser.Parser where
 
 import Text.Parsec
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as P
 
-import ParseSyntax
-import IndentParser
-import LanguageDef
+import Reach.Parser.ParseSyntax
+import Reach.Parser.IndentParser
+import Reach.Parser.LanguageDef
 
 import Control.Monad
 import Control.Monad.Identity
@@ -18,6 +18,8 @@ import System.IO.Unsafe
 
 --myParse parser  input = runIndent "" $
 --  runParserT parser () "" input
+--
+--
 
 parserI = parseI
 

@@ -1,4 +1,4 @@
-module Syntax where
+module Reach.Syntax where
 
 data VarID = VarID Int String
 

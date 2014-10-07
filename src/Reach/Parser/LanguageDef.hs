@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module LanguageDef where
+module Reach.Parser.LanguageDef where
 
 import Text.Parsec
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as P
 
-import IndentParser
+import Reach.Parser.IndentParser
 
 import Control.Monad
 import Control.Monad.Identity
