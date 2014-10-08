@@ -1,6 +1,7 @@
+
 v = { case x of   
-  a c d -> q;
-  b -> r;
+  Con a l -> a;
+  Empty -> Empty;
 }
 
 t = { v x }

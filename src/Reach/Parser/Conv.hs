@@ -13,7 +13,6 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 
-exp = 
 
 conv :: [P.Def] -> Defs
 conv = undefined
@@ -25,7 +24,7 @@ funNames ds = let fns = [a | (P.Def a _ _) <-ds ] in
 toEnv :: Defs -> Env
 toEnv = undefined
 
-constrNames :: P.Exp -> [String]
+constrNames :: [P.Def] -> [String]
 constrNames e = [n | P.Alt n _ _ <- universeBi e] 
 
 --expConv :: Map String Int -> P.Exp -> Exp

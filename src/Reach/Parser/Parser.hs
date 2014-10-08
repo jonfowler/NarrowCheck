@@ -5,25 +5,25 @@ module Reach.Parser.Parser where
 import Text.Parsec
 import Text.Parsec.Language
 import qualified Text.Parsec.Token as P
-
+--
 import Reach.Parser.ParseSyntax
 import Reach.Parser.IndentParser
 import Reach.Parser.LanguageDef
-
-import Control.Monad
-import Control.Monad.Identity
-import Control.Monad.State
-
-import System.IO.Unsafe
+--
+--import Control.Monad
 
 --myParse parser  input = runIndent "" $
 --  runParserT parser () "" input
 --
 --
 
-parserI = parseI
+readProg :: String -> IO [Def]
+readProg fp = do 
+  s <- readFile fp 
+  let Right a = parseI parseFile s
+  return a
 
-readU = unsafePerformIO . readFile
+parserI = parseI
 
 def :: ParsecI Def
 def = do

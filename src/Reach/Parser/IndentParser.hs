@@ -3,6 +3,7 @@ module Reach.Parser.IndentParser where
 import Text.Parsec
 import Text.Parsec.Pos
 import Text.Parsec.Token
+
 import Control.Monad.Identity
 
 data ParseState = ParseState
