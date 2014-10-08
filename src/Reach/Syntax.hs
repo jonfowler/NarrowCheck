@@ -1,13 +1,26 @@
 module Reach.Syntax where
 
-data VarID = VarID Int String
+type VarID = Int 
 
-data Alt = Alt VarID [VarID] Exp 
+data ConID = ConID Int String
+
+type FunID = Int
+
+data Alt = Alt ConID [VarID] Exp 
 
 data Exp 
-  = Ap Exp Exp
+  = Ap FunID [Exp]
+  | Con ConID [Exp]
   | Var VarID
   | Lam VarID Exp
   | Case Exp [Alt]
+
+data Fun = Fun
+  { body :: Exp,
+    name :: FunID,
+    args :: [VarID],
+    varNum :: Int  
+  }
+ 
 
 
