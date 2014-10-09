@@ -9,6 +9,8 @@ import qualified Text.Parsec.Token as P
 import Reach.Parser.ParseSyntax
 import Reach.Parser.IndentParser
 import Reach.Parser.LanguageDef
+
+import Data.Char
 --
 --import Control.Monad
 
@@ -68,7 +70,10 @@ caseExpr = do
 appExpr :: ParsecI Exp
 appExpr = do 
   (e : es) <- many1 innerExpr 
-  return (Ap e es)
+  case e of
+    (Var a) -> return $ if isUpper (head a)
+                 then Con a es
+                 else Ap e es
 
 altPatt :: ParsecI Alt
 altPatt = do

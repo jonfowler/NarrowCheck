@@ -16,6 +16,7 @@ data Alt = Alt VarID [VarID] Exp
 
 data Exp 
   = Ap Exp [Exp]
+  | Con VarID [Exp]
   | Var VarID
   | Lam [VarID] Exp
   | Case Exp [Alt]
