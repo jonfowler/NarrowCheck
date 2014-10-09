@@ -17,7 +17,8 @@ data Exp
 
 data Fun = Fun
   { body :: Exp,
-    name :: FunID,
+    fid :: FunID,
+    name :: String,
     args :: [VarID],
     varNum :: Int  
   }

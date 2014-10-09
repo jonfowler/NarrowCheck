@@ -13,18 +13,21 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 
+import Control.Monad.Except
+import Control.Applicative
+import Data.Monoid
+
 import Data.Char
 import Data.Maybe
+import Data.Either
 
-conv :: [P.Def] -> Defs
+conv :: [P.Def] -> [Fun]
 conv = undefined
 
 funNames :: [P.Def] -> Conv String
 funNames ds = let fns = [a | (P.Def a _ _) <-ds ] in
-  foldl (\c a -> snd $ addVal a c) emptyConv fns
+  snd $ addVals fns emptyConv 
 
-toEnv :: Defs -> Env
-toEnv = undefined
 
 constrNames :: [P.Def] -> [String]
 constrNames e = [n | P.Alt n _ _ <- universeBi e] 
@@ -36,45 +39,85 @@ data Convs = Convs {
   locals :: Conv String
   } 
 
-conC :: Convs -> String -> Maybe ConID
-conC co cid = do 
-  newcid <- (toInt (cons co) cid)
-  return $ ConID newcid cid
+conC :: Monad m => Convs -> String -> ExceptT String m ConID
+conC co cid = fromMaybe (throwError "No constructor name") $ do
+  a <- toInt (cons co) cid
+  return . return $ ConID a cid
 
-funC :: Convs -> String -> Maybe FunID
-funC co  = toInt (funs co) 
+funC :: Monad m => Convs -> String -> ExceptT String m FunID
+funC co  = maybe (throwError "No function name") return 
+           . toInt (funs co)
 
-localC :: Convs -> String -> Maybe VarID
-localC co = toInt (locals co)
+localC :: Monad m => Convs -> String -> ExceptT String m VarID
+localC co = maybe (throwError "No local name") return 
+           . toInt (locals co)
 
-expConv :: Convs -> P.Exp -> Exp
-expConv m (P.Con c es) = fromJust $ do 
+data Moni b a = Moni b a
+
+editMoni :: b -> Moni c a -> Moni b a
+editMoni b (Moni _ a) = Moni b a
+
+
+instance Monoid b => Monad (Moni b) where
+  return = Moni mempty 
+  Moni m1 a >>= f = let Moni m2 b = f a
+    in Moni (m1 `mappend` m2) b
+
+instance Functor (Moni b) where
+  fmap f (Moni b a) = Moni b $ f a
+
+instance Monoid Int  where
+  mempty = 0
+  mappend = max
+
+expConv :: Convs -> P.Exp -> ExceptT String (Moni Int) Exp
+expConv m (P.Con c es) =  do 
   a <- conC m c
-  return $ Con a (map (expConv m) es)
+  newes <- mapM (expConv m) es
+  return $ Con a newes
 expConv m (P.Ap e []) = expConv m e
-expConv m (P.Ap (P.Var v) es) = fromJust $ do
+expConv m (P.Ap (P.Var v) es) =  do
   fid <- funC m v
-  return $ Ap fid (map (expConv m) es)
-expConv m (P.Var v) = case conC m v of
-  Just a -> Con a []
-  Nothing -> case funC m v of
-    Just a -> Ap a []
-    Nothing -> case localC m v of
-      Just a -> Var a
-      Nothing -> error "Variable must be local, fun or constr"
-expConv m (P.Case e as) = Case (expConv m e) (map (altConv m) as)
+  newes <- mapM (expConv m) es
+  return $ Ap fid newes 
+expConv m (P.Var v) = do
+  lval <- lift $ Moni (nextInt $ locals m) v
+  ((\a -> Con a []) <$> conC m lval)
+    <|> ((\a -> Ap a [])  <$> funC m lval)
+    <|> (Var <$> localC m lval)
+expConv m (P.Case e as) = do
+  a <- expConv m e
+  newas <- mapM (altConv m) as
+  return $ Case a newas
 
-altConv :: Convs -> P.Alt -> Alt
-altConv c (P.Alt vid newvs    = 
-      
+altConv :: Convs -> P.Alt -> ExceptT String (Moni Int) Alt
+altConv c (P.Alt vid vs e) = do
+  let (newvs, newls) = addVals vs $ locals c  
+      newc = c {locals = newls}
+  cid <- conC c vid
+  newe <- expConv newc e
+  return $ Alt cid newvs newe
+  
+defToFun :: Conv String -> Conv String -> P.Def -> Either String Fun
+defToFun fs cs (P.Def n vs e) = let 
+  (newvs,ls) = addVals vs emptyConv
+  c = Convs{ cons = cs, funs = fs, locals =ls}
+  Moni i a = runExceptT (expConv c e)
+  in fmap (\bod -> Fun {
+        body = bod,
+        fid = fromRight $ runExcept (funC c n),
+        name = n,
+        args = newvs,
+        varNum = i}) a
 
---expConv :: Map String Int -> P.Exp -> Exp
---expConv m (P.Ap e [])   = expConv m e 
---expConv m (P.Ap e1 [e2])  = Ap (expConv m e1) (expConv m e2)
---expConv m (P.Ap e1 es)  = let (e2:es2) = reverse es 
---  in Ap (expConv m $ P.Ap e1 (reverse es2)) (expConv m e2)
---  
---expConv m (P.Var v) = Var (VarID (m M.! v) v)
+fromRight (Right a) = a
+
+addVals :: Ord a => [a] -> Conv a -> ([Int], Conv a)
+addVals [] c = ([], c)
+addVals (a:as) c = let (i, c') = addVal a c
+                       (is, c'') = addVals as c'
+  in (i:is, c'')
+
 
 
 
