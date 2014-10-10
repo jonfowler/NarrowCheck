@@ -14,6 +14,7 @@ import qualified Data.Map as M
 import Data.Map (Map)
 
 import Control.Monad.Except
+import Control.Monad.Writer
 import Control.Applicative
 import Data.Monoid
 
@@ -21,17 +22,22 @@ import Data.Char
 import Data.Maybe
 import Data.Either
 
-conv :: [P.Def] -> [Fun]
-conv = undefined
+conv :: (Monad m, Functor m) => [P.Def] -> ExceptT String m [Fun] 
+conv ds = let
+  fs = funNames ds
+  cs = constrNames ds
+  in mapM (defToFun fs cs) ds
 
 funNames :: [P.Def] -> Conv String
 funNames ds = let fns = [a | (P.Def a _ _) <-ds ] in
   snd $ addVals fns emptyConv 
 
 
-constrNames :: [P.Def] -> [String]
-constrNames e = [n | P.Alt n _ _ <- universeBi e] 
-  ++ [n | P.Con n _ <- universeBi e, isUpper $ head n ]
+constrNames :: [P.Def] -> Conv String 
+constrNames e = let 
+  cs = [n | P.Alt n _ _ <- universeBi e] 
+       ++ [n | P.Con n _ <- universeBi e]
+  in snd $ addVals cs emptyConv
 
 data Convs = Convs {
   funs :: Conv String,
@@ -52,63 +58,52 @@ localC :: Monad m => Convs -> String -> ExceptT String m VarID
 localC co = maybe (throwError "No local name") return 
            . toInt (locals co)
 
-data Moni b a = Moni b a
-
-editMoni :: b -> Moni c a -> Moni b a
-editMoni b (Moni _ a) = Moni b a
-
-
-instance Monoid b => Monad (Moni b) where
-  return = Moni mempty 
-  Moni m1 a >>= f = let Moni m2 b = f a
-    in Moni (m1 `mappend` m2) b
-
-instance Functor (Moni b) where
-  fmap f (Moni b a) = Moni b $ f a
-
 instance Monoid Int  where
   mempty = 0
   mappend = max
 
-expConv :: Convs -> P.Exp -> ExceptT String (Moni Int) Exp
+
+expConv :: (Functor m, Monad m) => Convs -> P.Exp -> WriterT Int (ExceptT String m) Exp
 expConv m (P.Con c es) =  do 
-  a <- conC m c
+  a <- lift $ conC m c
   newes <- mapM (expConv m) es
   return $ Con a newes
 expConv m (P.Ap e []) = expConv m e
 expConv m (P.Ap (P.Var v) es) =  do
-  fid <- funC m v
+  fid <- lift $ funC m v
   newes <- mapM (expConv m) es
   return $ Ap fid newes 
 expConv m (P.Var v) = do
-  lval <- lift $ Moni (nextInt $ locals m) v
-  ((\a -> Con a []) <$> conC m lval)
-    <|> ((\a -> Ap a [])  <$> funC m lval)
-    <|> (Var <$> localC m lval)
+  lval <- writer (v, nextInt $ locals m )
+  ((\a -> Con a []) <$> lift (conC m lval))
+    <|> ((\a -> Ap a [])  <$> lift (funC m lval))
+    <|> (Var <$> lift (localC m lval))
 expConv m (P.Case e as) = do
   a <- expConv m e
   newas <- mapM (altConv m) as
   return $ Case a newas
 
-altConv :: Convs -> P.Alt -> ExceptT String (Moni Int) Alt
+altConv :: (Functor m, Monad m) => Convs -> P.Alt -> WriterT Int (ExceptT String m) Alt
 altConv c (P.Alt vid vs e) = do
   let (newvs, newls) = addVals vs $ locals c  
       newc = c {locals = newls}
-  cid <- conC c vid
+  cid <- lift $ conC c vid
   newe <- expConv newc e
   return $ Alt cid newvs newe
   
-defToFun :: Conv String -> Conv String -> P.Def -> Either String Fun
+defToFun :: (Monad m, Functor m) => 
+  Conv String -> Conv String -> P.Def -> ExceptT String m Fun
 defToFun fs cs (P.Def n vs e) = let 
   (newvs,ls) = addVals vs emptyConv
   c = Convs{ cons = cs, funs = fs, locals =ls}
-  Moni i a = runExceptT (expConv c e)
-  in fmap (\bod -> Fun {
-        body = bod,
+  in do
+    (a, i) <- runWriterT (expConv c e)
+    return Fun{
+        body = a,
         fid = fromRight $ runExcept (funC c n),
         name = n,
         args = newvs,
-        varNum = i}) a
+        varNum = i} 
 
 fromRight (Right a) = a
 
