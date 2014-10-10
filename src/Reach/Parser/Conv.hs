@@ -32,7 +32,6 @@ funNames :: [P.Def] -> Conv String
 funNames ds = let fns = [a | (P.Def a _ _) <-ds ] in
   snd $ addVals fns emptyConv 
 
-
 constrNames :: [P.Def] -> Conv String 
 constrNames e = let 
   cs = [n | P.Alt n _ _ <- universeBi e] 

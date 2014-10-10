@@ -1,12 +1,18 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Reach.Syntax where
+
+import Data.Data
 
 type VarID = Int 
 
 data ConID = ConID Int String
+  deriving (Show, Data, Typeable)
 
 type FunID = Int
 
 data Alt = Alt ConID [VarID] Exp 
+  deriving (Show, Data, Typeable)
 
 data Exp 
   = Ap FunID [Exp]
@@ -14,6 +20,7 @@ data Exp
   | Var VarID
   | Lam VarID Exp
   | Case Exp [Alt]
+  deriving (Show, Data, Typeable)
 
 data Fun = Fun
   { body :: Exp,
@@ -22,6 +29,7 @@ data Fun = Fun
     args :: [VarID],
     varNum :: Int  
   }
+  deriving (Show, Data, Typeable)
  
 
 

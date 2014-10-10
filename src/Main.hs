@@ -1,3 +1,9 @@
+import Reach.Parser.Parser
 import Reach.Parser.Conv
+import Control.Monad.Except
 
-main = undefined
+main = do
+  a <- readProg "/home/jon/Github/reach/src/Reach/Parser/test.txt"
+  print (runExcept $ conv a) 
+
+

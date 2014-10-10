@@ -1,7 +1,7 @@
 
-v = { case x of   
+v x = { case x of   
   Con a l -> a;
   Empty -> Empty;
 }
 
-t = { v x }
+t x = { x }
