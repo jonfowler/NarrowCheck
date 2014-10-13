@@ -15,14 +15,16 @@ data Alt = Alt ConID [VarID] Exp
   deriving (Show, Data, Typeable)
 
 data Exp 
-  = Ap FunID [Exp]
+  = Ap Exp [Exp]
   | Con ConID [Exp]
   | Var VarID
+  | Fun FunID
   | Lam VarID Exp
   | Case Exp [Alt]
+  | Target
   deriving (Show, Data, Typeable)
 
-data Fun = Fun
+data Func = Func
   { body :: Exp,
     fid :: FunID,
     name :: String,

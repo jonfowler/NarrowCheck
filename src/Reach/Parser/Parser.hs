@@ -59,6 +59,9 @@ lamExpr = do
   e <- expr 
   return (Lam vs e) 
 
+targetExpr :: ParsecI Exp
+targetExpr = reserved "Target" >> return Target
+
 caseExpr :: ParsecI Exp
 caseExpr = do
   reserved "case"

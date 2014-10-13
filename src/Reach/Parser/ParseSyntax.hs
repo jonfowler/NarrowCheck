@@ -20,6 +20,7 @@ data Exp
   | Var VarID
   | Lam [VarID] Exp
   | Case Exp [Alt]
+  | Target
   deriving (Show, Eq, Data, Typeable)
 
 

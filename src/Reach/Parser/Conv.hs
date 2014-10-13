@@ -22,7 +22,7 @@ import Data.Char
 import Data.Maybe
 import Data.Either
 
-conv :: (Monad m, Functor m) => [P.Def] -> ExceptT String m [Fun] 
+conv :: (Monad m, Functor m) => [P.Def] -> ExceptT String m [Func] 
 conv ds = let
   fs = funNames ds
   cs = constrNames ds
@@ -68,15 +68,16 @@ expConv m (P.Con c es) =  do
   newes <- mapM (expConv m) es
   return $ Con a newes
 expConv m (P.Ap e []) = expConv m e
-expConv m (P.Ap (P.Var v) es) =  do
-  fid <- lift $ funC m v
+expConv m (P.Ap e es) =  do
+  newe <- expConv m e
   newes <- mapM (expConv m) es
-  return $ Ap fid newes 
+  return $ Ap newe  newes 
 expConv m (P.Var v) = do
   lval <- writer (v, nextInt $ locals m )
   ((\a -> Con a []) <$> lift (conC m lval))
-    <|> ((\a -> Ap a [])  <$> lift (funC m lval))
-    <|> (Var <$> lift (localC m lval))
+    <|> Fun  <$> lift (funC m lval)
+    <|> Var <$> lift (localC m lval)
+expConv m P.Target = writer (Target, nextInt $ locals m)
 expConv m (P.Case e as) = do
   a <- expConv m e
   newas <- mapM (altConv m) as
@@ -91,13 +92,13 @@ altConv c (P.Alt vid vs e) = do
   return $ Alt cid newvs newe
   
 defToFun :: (Monad m, Functor m) => 
-  Conv String -> Conv String -> P.Def -> ExceptT String m Fun
+  Conv String -> Conv String -> P.Def -> ExceptT String m Func
 defToFun fs cs (P.Def n vs e) = let 
   (newvs,ls) = addVals vs emptyConv
   c = Convs{ cons = cs, funs = fs, locals =ls}
   in do
     (a, i) <- runWriterT (expConv c e)
-    return Fun{
+    return Func{
         body = a,
         fid = fromRight $ runExcept (funC c n),
         name = n,

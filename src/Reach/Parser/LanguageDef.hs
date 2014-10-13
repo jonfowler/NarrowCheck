@@ -23,7 +23,7 @@ myTokens = P.LanguageDef
   , P.opStart	 = P.opLetter myTokens 
   , P.opLetter	 = oneOf ":!#$%&*+./<=>?@\\^|-~"
   , P.reservedOpNames= ["=", "->",";", "\\"]
-  , P.reservedNames  = ["case", "of"]
+  , P.reservedNames  = ["case", "of", "Target"]
   , P.caseSensitive  = True
   }
 
