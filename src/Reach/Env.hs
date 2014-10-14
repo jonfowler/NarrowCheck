@@ -3,8 +3,8 @@
 module Reach.Env
   ( Env(..),
     emptyEnv,
-    inlineFun,
-    toProg
+    toProg,
+    replaceVar
   ) where
 
 import Reach.Syntax
@@ -38,18 +38,7 @@ toProg m = case find ((=="main") . name) m of
    in (Fun $ fid (funcs I.! ffid a) , emptyEnv {_funs = funcs })
   Nothing -> error "no main"
 
-bind :: (MonadState Env m) => VarID -> Exp -> m ()
-bind v e = modify (\s -> s { _env = I.insert (fromVarID v) e $ _env s}) 
 
-inlineFun :: (MonadState Env m, Functor m) => FunID -> [Exp] -> m Exp 
-inlineFun fid es = do
-  s <- get
-  let f = _funs s I.! fromFunID fid
-  let nv = _nextVar s
-  put (s {_nextVar = nv + varNum f})
-  zipWithM_ bind (map (nv+) $ args f) es
-  return (replaceVar nv $ body f)
- 
 replaceVar :: VarID -> Exp -> Exp
 replaceVar i = transformBi f
   where f (VarID v) = VarID v + i
