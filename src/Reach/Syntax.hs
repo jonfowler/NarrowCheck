@@ -1,15 +1,18 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Reach.Syntax where
 
 import Data.Data
 
-type VarID = Int 
+newtype VarID = VarID {fromVarID :: Int } 
+  deriving (Show, Eq, Num, Data, Typeable)
 
 data ConID = ConID Int String
   deriving (Show, Data, Typeable)
 
-type FunID = Int
+newtype FunID = FunID {fromFunID :: Int}
+  deriving (Show, Eq, Num, Data, Typeable)
 
 data Alt = Alt ConID [VarID] Exp 
   deriving (Show, Data, Typeable)
@@ -29,7 +32,7 @@ data Func = Func
     fid :: FunID,
     name :: String,
     args :: [VarID],
-    varNum :: Int  
+    varNum :: VarID  
   }
   deriving (Show, Data, Typeable)
  

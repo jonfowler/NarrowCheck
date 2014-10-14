@@ -4,7 +4,6 @@ module Reach.Parser.Conv where
 import Data.Generics.Uniplate.Data
 
 import Reach.Syntax
-import Reach.Env
 import qualified Reach.Parser.ParseSyntax as P
 import Reach.Parser.Parser
 
@@ -50,11 +49,11 @@ conC co cid = fromMaybe (throwError "No constructor name") $ do
   return . return $ ConID a cid
 
 funC :: Monad m => Convs -> String -> ExceptT String m FunID
-funC co  = maybe (throwError "No function name") return 
+funC co  = maybe (throwError "No function name") (return . FunID) 
            . toInt (funs co)
 
 localC :: Monad m => Convs -> String -> ExceptT String m VarID
-localC co = maybe (throwError "No local name") return 
+localC co = maybe (throwError "No local name") (return . VarID)
            . toInt (locals co)
 
 instance Monoid Int  where
@@ -89,7 +88,7 @@ altConv c (P.Alt vid vs e) = do
       newc = c {locals = newls}
   cid <- lift $ conC c vid
   newe <- expConv newc e
-  return $ Alt cid newvs newe
+  return $ Alt cid (map VarID newvs) newe
   
 defToFun :: (Monad m, Functor m) => 
   Conv String -> Conv String -> P.Def -> ExceptT String m Func
@@ -102,8 +101,8 @@ defToFun fs cs (P.Def n vs e) = let
         body = a,
         fid = fromRight $ runExcept (funC c n),
         name = n,
-        args = newvs,
-        varNum = i} 
+        args = map VarID newvs,
+        varNum = VarID i} 
 
 fromRight (Right a) = a
 
