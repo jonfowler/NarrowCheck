@@ -1,15 +1,14 @@
 module Reach.Eval
- (module Reach.Monad,
- module Reach.Env,
- module Reach.Syntax,
+ (module X,
  bind,  
- look,
+ look,  
+ findAlt,
  inlineFun
  ) where
 
-import Reach.Env
-import Reach.Syntax
-import Reach.Monad
+import Reach.Env as X
+import Reach.Syntax as X
+import Reach.Monad as X
 import Data.List
 
 import qualified Data.IntMap as I

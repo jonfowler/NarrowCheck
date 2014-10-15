@@ -1,18 +1,17 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Reach.Monad
-  ( module Control.Monad.State,
-    module Control.Monad.Except,
-    module Control.Monad.Identity,
+  ( module X,
     ReachT,
     ReachL,
     Reach,
-    ReachError(..)
+    ReachError(..),
+    runReach
   ) where
 
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Identity
+import Control.Monad.Except as X
+import Control.Monad.State as X
+import Control.Monad.Identity as X
 import Reach.Env
 
 data ReachError 
@@ -20,9 +19,10 @@ data ReachError
   | RunTimeError String
   | RecursiveLimit
   | ConstraintFail
+  deriving Show
 
 newtype ReachT m a = Reach 
-  { fromReach :: Env -> m (Either ReachError a, Env)
+  { runReach :: Env -> m (Either ReachError a, Env)
   }
 
 type ReachL  = ReachT []
@@ -33,7 +33,7 @@ instance Monad m => Monad (ReachT m) where
   (Reach m) >>= g = Reach $ \env -> do 
       (err, env2) <- m env 
       case err of
-        Right a -> fromReach (g a) env2
+        Right a -> runReach (g a) env2
         Left e -> return (Left e, env2)
 
 instance Monad m => MonadState Env (ReachT m) where
@@ -46,6 +46,6 @@ instance Monad m => MonadError ReachError (ReachT m) where
   catchError (Reach m) handler = Reach $ \env -> do
     (a, env2) <- m env
     case a of
-      Left e -> fromReach (handler e) env2
+      Left e -> runReach (handler e) env2
       Right a -> return (Right a, env2)
     
