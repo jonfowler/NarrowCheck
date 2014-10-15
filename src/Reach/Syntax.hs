@@ -11,6 +11,9 @@ newtype VarID = VarID {fromVarID :: Int }
 data ConID = ConID Int String
   deriving (Show, Data, Typeable)
 
+instance Eq ConID where
+  ConID a _ == ConID b _ = a == b
+
 newtype FunID = FunID {fromFunID :: Int}
   deriving (Show, Eq, Num, Data, Typeable)
 
@@ -25,6 +28,22 @@ data Exp
   | Lam VarID Exp
   | Case Exp [Alt]
   | Target
+  deriving (Show, Data, Typeable)
+
+data CaseS
+  = CaseS ExpS [AltS]
+  deriving (Show, Data, Typeable)
+
+data AltS = AltS
+  deriving (Show, Data, Typeable)
+
+data ExpS 
+  = ApS CaseS [CaseS]
+  | ConS ConID [CaseS]
+  | VarS VarID
+  | FunS FunID
+  | LamS VarID Exp
+  | TargetS
   deriving (Show, Data, Typeable)
 
 data Func = Func

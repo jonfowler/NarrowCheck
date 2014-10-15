@@ -4,7 +4,9 @@ module Reach.Env
   ( Env(..),
     emptyEnv,
     toProg,
-    replaceVar
+    findF,
+    lookupV,
+    insertV
   ) where
 
 import Reach.Syntax
@@ -14,13 +16,21 @@ import Data.List
 import Control.Monad
 import Control.Monad.State
 import Control.Applicative
-import Data.Generics.Uniplate.Data
 
 data Env = Env
   { _funs :: IntMap Func
   , _env :: IntMap Exp
   , _nextVar :: VarID 
   }
+
+lookupV :: VarID -> Env -> Maybe Exp 
+lookupV (VarID v) = I.lookup v . _env
+
+insertV :: VarID -> Exp -> Env -> Env
+insertV (VarID v) e s = Env {_env = I.insert v e $ _env s}
+
+findF :: FunID -> Env -> Func 
+findF (FunID f) = (I.! f) . _funs
 
 emptyEnv :: Env
 emptyEnv = Env
@@ -39,7 +49,4 @@ toProg m = case find ((=="main") . name) m of
   Nothing -> error "no main"
 
 
-replaceVar :: VarID -> Exp -> Exp
-replaceVar i = transformBi f
-  where f (VarID v) = VarID v + i
-        f a = a
+

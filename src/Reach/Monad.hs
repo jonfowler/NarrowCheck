@@ -3,9 +3,11 @@
 module Reach.Monad
   ( module Control.Monad.State,
     module Control.Monad.Except,
+    module Control.Monad.Identity,
     ReachT,
     ReachL,
-    Reach
+    Reach,
+    ReachError(..)
   ) where
 
 import Control.Monad.Except
@@ -15,6 +17,7 @@ import Reach.Env
 
 data ReachError 
   = DepthLimit
+  | RunTimeError String
   | RecursiveLimit
   | ConstraintFail
 
