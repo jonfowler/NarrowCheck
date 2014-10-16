@@ -30,6 +30,11 @@ data Exp
   | Target
   deriving (Show, Data, Typeable)
 
+printVal :: Exp -> String
+printVal (Con (ConID _ s) []) = s
+printVal (Con (ConID _ s) es) = "(" ++ s ++ " " ++ unwords (map printVal es) ++ ")"
+printVal (Var _) = "*"
+
 data CaseS
   = CaseS ExpS [AltS]
   deriving (Show, Data, Typeable)
