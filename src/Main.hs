@@ -37,7 +37,7 @@ go fn flags = do
     Left e -> print e
     Right fs -> do
       let (e, xs, s) = toProg fs dd 10
-      let res = [ map (getExp s) xs  | (Right _,s) <- normalF e s ]
+      let res =  map (\s -> map (getExp s) xs)  $ reachF e s 
       mapM_ (putStrLn . unwords . map printVal) res
   where
     (dd:_) = [d | DataBound d <- flags] ++ [100000000]

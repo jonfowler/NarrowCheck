@@ -1,5 +1,5 @@
 
-main x y = { three (add (S (S y)) (S x))
+main x y = { three (add y x)
 }
 
 add x y = { case x of 
@@ -12,7 +12,7 @@ three x = { case x of
     S z -> case z of   
       S u -> case u of
         S l -> False;
-        Z -> True;;
+        Z -> Target;;
       Z -> False;;
     Z -> False;;
   Z -> False ;

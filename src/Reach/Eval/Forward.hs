@@ -38,3 +38,6 @@ evalF e s = runReach (eval e) s
 normalF :: Exp -> Env -> [(Either ReachError Exp, Env)]
 normalF e s = runReach (normal e) s
 
+reachF :: Exp -> Env -> [ Env ]
+reachF e s = [ s | (Right Target, s) <- normalF e s ]
+

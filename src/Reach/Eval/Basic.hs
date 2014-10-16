@@ -33,9 +33,12 @@ eval a = return a
 
 
 normal :: (Match m, Monad m) => Exp -> ReachT m Exp
+normal Target = return Target
 normal (Con cid es)  = do
   es' <- mapM normal es
-  return $ Con cid es'
+  if null [ 0 | Target <- es']
+  then return $ Con cid es'
+  else return Target
 normal e = eval e >>= normal
 
 instance Match Identity where
