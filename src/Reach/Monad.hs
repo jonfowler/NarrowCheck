@@ -12,7 +12,10 @@ module Reach.Monad
 import Control.Monad.Except as X
 import Control.Monad.State as X
 import Control.Monad.Identity as X
+import Control.Monad.Trans as X
+
 import Reach.Env
+
 
 data ReachError 
   = DepthLimit
@@ -48,4 +51,7 @@ instance Monad m => MonadError ReachError (ReachT m) where
     case a of
       Left e -> runReach (handler e) env2
       Right a -> return (Right a, env2)
+
+instance MonadTrans ReachT where
+  lift l = Reach $ \env -> liftM (\a -> (Right a, env)) l
     
