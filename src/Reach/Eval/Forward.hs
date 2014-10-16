@@ -16,14 +16,20 @@ instance Match [] where
     case a of
       Just _ -> throwError (RunTimeError "Variable bound in match statement")
       Nothing -> do
-        alt <- lift alts
-        e <- bindAlt x alt
-        eval e 
+        i <- getD x
+        a <- getMaxD
+        if i < a 
+        then do  
+          alt <- lift alts
+          e <- bindAlt x (i+1) alt
+          eval e 
+        else throwError DepthLimit
   match _ _ = throwError (RunTimeError "Basic Evaluation: match called with argument which is not a variable/value")
 
-bindAlt :: VarID -> Alt -> ReachT [] Exp
-bindAlt v (Alt cid vs e) = do
-  bind v (Con cid (map Var vs))
+bindAlt :: VarID -> Int -> Alt -> ReachT [] Exp
+bindAlt x i (Alt cid xs e) = do
+  bind x (Con cid (map Var xs))
+  mapM_ (flip bindD i) xs
   return e
   
 evalF :: Exp -> Env -> [(Either ReachError Exp, Env)]

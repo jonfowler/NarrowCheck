@@ -3,6 +3,7 @@
 module Reach.Eval.Basic where
 
 import Reach.Eval
+import Debug.Trace
 
 
 eval :: (Match m, Monad m) => Exp -> ReachT m Exp
@@ -25,7 +26,8 @@ eval (Ap e es) = do
 
 eval (Case subj alts) = do
   a <- eval subj
-  match a alts
+  e <- match a alts 
+  eval e
 
 eval a = return a
 
