@@ -15,7 +15,7 @@ eval (Var x) = do
       bind x v
       return v
 
-eval (Ap (Fun fid) es) = inlineFun fid es
+eval (Ap (Fun fid) es) = inlineFun fid es >>= eval
 
 eval (Ap (Con _ _) _) = throwError (RunTimeError "Constructor in application")
 
@@ -29,10 +29,27 @@ eval (Case subj alts) = do
 
 eval a = return a
 
+
+normal :: (Match m, Monad m) => Exp -> ReachT m Exp
+normal (Con cid es)  = do
+  es' <- mapM normal es
+  return $ Con cid es'
+normal e = eval e >>= normal
+
 instance Match Identity where
-  match (Con cid es) alts = 
-  match Target _ = Target
-  match _ _ = throwError (RunTimeError "Basic Evaluation: match called with argument which is not a value)
+  match (Con cid es) alts = case findAlt cid alts of
+    Just (Alt _ vs e) -> do
+      zipWithM_ bind vs es
+      return e
+    Nothing -> throwError (RunTimeError "Incomplete Case Expression")
+  match Target _ = return Target
+  match _ _ = throwError (RunTimeError "Basic Evaluation: match called with argument which is not a value")
 
 class Match m where
   match :: Exp -> [Alt] -> ReachT m Exp
+
+evalB :: Exp -> Env -> (Either ReachError Exp, Env)
+evalB e s = runIdentity $ runReach (eval e) s
+
+normalB :: Exp -> Env -> (Either ReachError Exp, Env)
+normalB e s = runIdentity $ runReach (normal e) s

@@ -22,8 +22,10 @@ import Data.Char
 readProg :: String -> IO [Def]
 readProg fp = do 
   s <- readFile fp 
-  let Right a = parseI parseFile s
-  return a
+  case parseI parseFile s of
+    Left e -> print e >> return undefined
+    Right a -> return a
+    
 
 parserI = parseI
 
