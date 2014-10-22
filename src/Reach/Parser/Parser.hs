@@ -82,11 +82,15 @@ appExpr = do
                  else Ap e es
     Target -> return Target
 
+pattern :: ParsecI Pattern
+pattern =   parens pattern
+       <|>  undefined
+
 altPatt :: ParsecI Alt
 altPatt = do
-  (c : vs) <- many1 identifier
+  p <- pattern
   reserved "->" 
   e <- expr 
   reserved ";"
-  return (Alt c vs e)
+  return (Alt p e)
 

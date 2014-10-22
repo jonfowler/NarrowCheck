@@ -11,6 +11,7 @@ instance Match [] where
       return e
     Nothing -> throwError (RunTimeError "Incomplete Case Expression")
   match Target _ = return Target
+
   match (Var x) alts = do
     a <- look x
     case a of

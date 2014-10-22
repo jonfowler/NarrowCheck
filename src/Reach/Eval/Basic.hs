@@ -21,8 +21,8 @@ eval (Ap (Fun fid) es) = inlineFun fid es >>= eval
 eval (Ap (Con _ _) _) = throwError (RunTimeError "Constructor in application")
 
 eval (Ap e es) = do
-  v <- eval e
-  eval $ Ap v es
+  f <- eval e
+  eval $ Ap f es
 
 eval (Case subj alts) = do
   a <- eval subj
