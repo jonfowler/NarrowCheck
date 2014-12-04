@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module Reach.Monad
   ( module X,
@@ -9,7 +10,7 @@ module Reach.Monad
     runReach
   ) where
 
-import Control.Monad.Except as X
+--import Control.Monad.Except as X
 import Control.Monad.State as X
 import Control.Monad.Identity as X
 import Reach.Env
@@ -40,6 +41,10 @@ instance Monad m => MonadState Env (ReachT m) where
   get = Reach $ \env -> return (Right env, env)
   put env = Reach $ \_ -> return (Right (), env)
   state f = Reach $ \env -> let (a, env2) = f env in return (Right a, env2)
+
+class Monad m => MonadError e m | m -> e where
+  throwError :: e -> m a
+  catchError :: m a -> (e -> m a) -> m a
 
 instance Monad m => MonadError ReachError (ReachT m) where
   throwError e = Reach $ \env -> return (Left e, env)

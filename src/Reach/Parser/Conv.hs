@@ -1,6 +1,5 @@
 module Reach.Parser.Conv where
 
-
 import Data.Generics.Uniplate.Data
 
 import Reach.Syntax
@@ -12,7 +11,6 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 
-import Control.Monad.Except
 import Control.Monad.Writer
 import Control.Applicative
 import Data.Monoid

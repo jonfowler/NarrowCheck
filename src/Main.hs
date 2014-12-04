@@ -1,6 +1,6 @@
 import Reach.Parser.Parser
 import Reach.Parser.Conv
-import Control.Monad.Except
+import Reach.Monad
 import Reach.Eval.Basic
 import Reach.Env
 
