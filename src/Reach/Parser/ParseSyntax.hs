@@ -5,24 +5,21 @@ module Reach.Parser.ParseSyntax where
 import Data.Generics.Uniplate.Data
 import Data.Data
 
-data Def = Def VarID [VarID] Exp
+data Def vid vid = Def vid [vid] Exp
   deriving (Show, Eq, Data, Typeable)
 
-
-type VarID = String
-
-data Alt = Alt Pattern Exp 
+data Alt vid = Alt Pattern Exp 
   deriving (Show, Eq, Data, Typeable)
 
-data Pattern = ConP VarID [Pattern]
-             | VarP VarID
+data Pattern vid = ConP vid [Pattern]
+             | VarP vid
   deriving (Show, Eq, Data, Typeable)
 
-data Exp 
+data Exp vid 
   = Ap Exp [Exp]
-  | Con VarID [Exp]
-  | Var VarID
-  | Lam [VarID] Exp
+  | Con vid [Exp]
+  | Var vid
+  | Lam [vid] Exp
   | Case Exp [Alt]
   | Target
   deriving (Show, Eq, Data, Typeable)
