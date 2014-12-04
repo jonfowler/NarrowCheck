@@ -12,6 +12,7 @@ import qualified Data.Map as M
 import Data.Map (Map)
 
 import Control.Monad.Writer
+import Control.Monad.Except
 import Control.Applicative
 import Data.Monoid
 
@@ -31,7 +32,7 @@ funNames ds = let fns = [a | (P.Def a _ _) <-ds ] in
 
 constrNames :: [P.Def] -> Conv String 
 constrNames e = let 
-  cs = [n | P.Alt n _ _ <- universeBi e] 
+  cs = [n | P.ConP n _ <- universeBi e] 
        ++ [n | P.Con n _ <- universeBi e]
   in snd $ addVals cs emptyConv
 
@@ -80,13 +81,20 @@ expConv m (P.Case e as) = do
   newas <- mapM (altConv m) as
   return $ Case a newas
 
+data TreeP a 
+  = LeafP a
+  | NodeP VarID 
+
+mergePats :: [(P.Pattern, a)] -> TreeP a 
+
 altConv :: (Functor m, Monad m) => Convs -> P.Alt -> WriterT Int (ExceptT String m) Alt
-altConv c (P.Alt vid vs e) = do
-  let (newvs, newls) = addVals vs $ locals c  
-      newc = c {locals = newls}
-  cid <- lift $ conC c vid
-  newe <- expConv newc e
-  return $ Alt cid (map VarID newvs) newe
+altConv c (P.Alt pat e) = undefined
+-- do
+--  let (newvs, newls) = addVals vs $ locals c  
+--      newc = c {locals = newls}
+--  cid <- lift $ conC c vid
+--  newe <- expConv newc e
+--  return $ Alt cid (map VarID newvs) newe
   
 defToFun :: (Monad m, Functor m) => 
   Conv String -> Conv String -> P.Def -> ExceptT String m Func
