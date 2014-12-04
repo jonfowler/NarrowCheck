@@ -2,6 +2,9 @@ module Reach.Eval
  (module X,
  bind,  
  look,  
+ bindD,
+ getD,
+ getMaxD,
  findAlt,
  inlineFun
  ) where
@@ -19,6 +22,19 @@ import Data.Generics.Uniplate.Data
 
 bind :: Monad m => VarID -> Exp -> ReachT m ()
 bind v e = modify (insertV v e) 
+
+bindD :: Monad m => VarID -> Int -> ReachT m ()
+bindD v i = modify (insertD v i)
+
+getD :: Monad m => VarID ->  ReachT m Int
+getD x = do
+  a <- lookupD x `liftM` get
+  case a of
+    Just i -> return i
+    Nothing -> throwError (RunTimeError "getD -> no depth for variable")
+
+getMaxD :: Monad m => ReachT m Int
+getMaxD = maxd `liftM` get 
 
 look :: Monad m => VarID -> ReachT m (Maybe Exp)
 look (VarID v) = do 

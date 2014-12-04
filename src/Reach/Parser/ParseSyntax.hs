@@ -11,7 +11,11 @@ data Def = Def VarID [VarID] Exp
 
 type VarID = String
 
-data Alt = Alt VarID [VarID] Exp 
+data Alt = Alt Pattern Exp 
+  deriving (Show, Eq, Data, Typeable)
+
+data Pattern = ConP VarID [Pattern]
+             | VarP VarID
   deriving (Show, Eq, Data, Typeable)
 
 data Exp 

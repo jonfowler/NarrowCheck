@@ -49,6 +49,7 @@ expr =  caseExpr
 innerExpr :: ParsecI Exp
 innerExpr = parens expr 
          <|> varExpr
+         <|> targetExpr
 
 varExpr :: ParsecI Exp
 varExpr = fmap Var identifier 
@@ -79,12 +80,17 @@ appExpr = do
     (Var a) -> return $ if isUpper (head a)
                  then Con a es
                  else Ap e es
+    Target -> return Target
+
+pattern :: ParsecI Pattern
+pattern =   parens pattern
+       <|>  undefined
 
 altPatt :: ParsecI Alt
 altPatt = do
-  (c : vs) <- many1 identifier
+  p <- pattern
   reserved "->" 
   e <- expr 
   reserved ";"
-  return (Alt c vs e)
+  return (Alt p e)
 

@@ -3,6 +3,7 @@
 module Reach.Eval.Basic where
 
 import Reach.Eval
+import Debug.Trace
 
 
 eval :: (Match m, Monad m) => Exp -> ReachT m Exp
@@ -20,20 +21,24 @@ eval (Ap (Fun fid) es) = inlineFun fid es >>= eval
 eval (Ap (Con _ _) _) = throwError (RunTimeError "Constructor in application")
 
 eval (Ap e es) = do
-  v <- eval e
-  eval $ Ap v es
+  f <- eval e
+  eval $ Ap f es
 
 eval (Case subj alts) = do
   a <- eval subj
-  match a alts
+  e <- match a alts 
+  eval e
 
 eval a = return a
 
 
 normal :: (Match m, Monad m) => Exp -> ReachT m Exp
+normal Target = return Target
 normal (Con cid es)  = do
   es' <- mapM normal es
-  return $ Con cid es'
+  if null [ 0 | Target <- es']
+  then return $ Con cid es'
+  else return Target
 normal e = eval e >>= normal
 
 instance Match Identity where

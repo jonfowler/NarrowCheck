@@ -1,9 +1,0 @@
-
-main = { add (S Z) (S (S Z))
-}
-
-add x y = { case x of 
-  S v -> S (add v y) ;
-  Z -> y ;
-}
-  
