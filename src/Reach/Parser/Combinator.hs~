@@ -1,0 +1,3 @@
+module Combinator where
+
+data Parse a = Parse (String -> Just a)
