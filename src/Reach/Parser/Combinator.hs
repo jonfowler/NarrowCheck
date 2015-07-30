@@ -30,4 +30,9 @@ char a = Parse $ \s -> case s of
   (a' : s') -> if a == a' then Just (() , s') else Nothing
 
 
-  
+test a b = case a of
+    Nothing -> Nothing
+    Just c -> case c of
+      Nothing -> Nothing
+      Just d -> r 
+      where r = undefined
