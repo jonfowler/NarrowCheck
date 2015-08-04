@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Reach.Parser.Combinator where
 
@@ -6,65 +8,67 @@ import Data.Maybe
 import Control.Arrow
 import Control.Applicative
 import Control.Monad
-
-data Parse t a = Parse {runParse :: ([t] -> Maybe (a , [t]))}
+import Control.Monad.State
+import Control.Monad.Except
 
 data Parser t a
-  = Done a 
-  | Fail 
-  | Cont (t -> Parser t a)
+  = Done a
+  | Fail String
+  | Read (t -> Parser t a)
+  | Choice (Parser t a) (Parser t a) 
+  | Try (Parser t a)
   deriving (Functor)
                   
-                  
-
-instance Functor (Parse t) where
-  fmap f (Parse p) = Parse $ fmap (first f) . p
-
-instance Applicative (Parse t) where
-  pure a = Parse (\s -> Just (a , s))
-  Parse p <*> Parse p' = Parse $ \s ->
-    p s >>= \(f , s') -> fmap (first f) (p' s')
+pmap :: (a -> Parser t b) -> (Parser t a -> Parser t b) ->
+          Parser t a -> Parser t b
+pmap f g (Done a) = f a
+pmap f g (Fail e) = Fail e
+pmap f g (Read p) = Read (g <$> p)
+pmap f g (Choice p q) = Choice (g p) (g q)
+pmap f g (Try p) = Try (g p)
 
 instance Applicative (Parser t) where
   pure = Done
-  Done f <*> a = f <$> a
-  Fail <*> _ = Fail
-  Cont p <*> a = Cont (\t -> p t <*> a)
-
-instance Monad (Parse t) where
-  return = pure
-  Parse p >>= m = Parse $ \s ->
-    p s >>= \(a , s') -> runParse (m a) s'
+  p <*> q = pmap (<$> q) (<*> q) p
 
 instance Monad (Parser t) where
-  return = pure 
-  Done a >>= m = m a 
-  Fail >>= _ = Fail
-  Cont p >>= f = Cont (p >=> f)
+  return = Done
+  p >>= q = pmap q (>>= q) p
 
 instance Alternative (Parser t) where
-  empty = Fail
-  Done a <|> _ = Done a
-  Fail <|> p = p
-  Cont p <|> Cont q = Cont (\t -> p t <|> q t)
-  Cont p <|> Fail = Cont p
-  Cont p <|> Done a = Cont (\t -> p t <|> Done a)
+  empty = Fail ""
+  p <|> q = Choice p q
 
-instance Alternative (Parse t) where
-  empty = Parse (\s -> Nothing)
-  Parse p <|> Parse p' = Parse $ \s ->
-    p s <|> p' s
+type ParseMonad t a = ExceptT String (State [t]) a  --ParseMonad (m a) deriving (Functor)
 
-char :: Char -> Parse Char () 
-char a = Parse $ \s -> case s of
-  [] -> Nothing
-  (a' : s') -> if a == a' then Just (() , s') else Nothing
+runParser :: Parser t a -> [t] -> (Either String a , [t])
+runParser p ts = runState (runExceptT (parseMonad p)) ts
 
-token :: Eq a => a -> Parser a ()
-token a = Cont $ \t -> case t == a of
-  True -> Done () 
-  False -> Fail
+parseMonad :: Parser t a -> ParseMonad t a
+parseMonad (Done a) = return a
+parseMonad (Fail e) = throwError e
+parseMonad (Read f) = do
+  ts <- get
+  case ts of
+    [] -> throwError "EOF"
+    (t : ts') -> case f t of
+      Fail e -> throwError e 
+      p -> put ts' >> parseMonad (f t)
+parseMonad (Choice p q) = catchError (parseMonad p) (const (parseMonad q))
+parseMonad (Try p) = do
+  ts <- get
+  catchError (parseMonad p) (\e -> put ts >> throwError e)
 
+token :: (Show t, Eq t) => t -> Parser t ()
+token t = Read $ \t' -> case t == t' of
+  False -> Fail $ "Expecting: " ++ show t ++ " Found: " ++ show t'
+  True -> Done ()
+
+word :: (Show t, Eq t) => [t] -> Parser t ()
+word [] = Done ()
+word (t : ts) = Read $ \t' -> case t == t' of
+  False -> Fail $ "Expecting: " ++ show t ++ " Found: " ++ show t'
+  True -> word ts
 
 test a b = case a of
     Nothing -> Nothing
@@ -73,3 +77,5 @@ test a b = case a of
        Nothing
       Just d -> r 
       where r = undefined
+
+test2 a b = case a of {Nothing -> b; Just a -> b }
