@@ -1,0 +1,11 @@
+module Tokens where
+
+data Token =
+  | TSpace
+  | TNewLine
+  | TWord String
+  | TOp
+  | TEq 
+  | Case
+  | Of
+  

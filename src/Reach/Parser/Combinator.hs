@@ -39,43 +39,61 @@ instance Alternative (Parser t) where
   empty = Fail ""
   p <|> q = Choice p q
 
-type ParseMonad t a = ExceptT String (State [t]) a  --ParseMonad (m a) deriving (Functor)
+data ParseState t = ParseState
+   { _inputState :: [t]
+   }
 
-runParser :: Parser t a -> [t] -> (Either String a , [t])
-runParser p ts = runState (runExceptT (parseMonad p)) ts
+getInput :: Monad m => ParseMonad t m [t] 
+getInput = _inputState <$> get 
 
-parseMonad :: Parser t a -> ParseMonad t a
+putInput :: Monad m => [t] -> ParseMonad t m () 
+putInput ts = modify (\ParseState {_inputState = _} ->  ParseState {_inputState = ts})
+
+type ParseMonad t m a = ExceptT String (StateT (ParseState t) m) a  --ParseMonad (m a) deriving (Functor)
+
+runParser :: Parser t a -> [t] -> (Either String a , ParseState t)
+runParser p ts = runState (runExceptT (parseMonad p)) (ParseState {_inputState = ts})
+
+parseMonad :: Monad m => Parser t a -> ParseMonad t m a
 parseMonad (Done a) = return a
 parseMonad (Fail e) = throwError e
 parseMonad (Read f) = do
-  ts <- get
+  ts <- getInput
   case ts of
     [] -> throwError "EOF"
     (t : ts') -> case f t of
       Fail e -> throwError e 
-      p -> put ts' >> parseMonad (f t)
+      p -> putInput ts' >> parseMonad (f t)
 parseMonad (Choice p q) = catchError (parseMonad p) (const (parseMonad q))
 parseMonad (Try p) = do
-  ts <- get
-  catchError (parseMonad p) (\e -> put ts >> throwError e)
+  ts <- getInput
+  catchError (parseMonad p) (\e -> putInput ts >> throwError e)
 
 token :: (Show t, Eq t) => t -> Parser t ()
 token t = Read $ \t' -> case t == t' of
   False -> Fail $ "Expecting: " ++ show t ++ " Found: " ++ show t'
   True -> Done ()
 
-word :: (Show t, Eq t) => [t] -> Parser t ()
-word [] = Done ()
-word (t : ts) = Read $ \t' -> case t == t' of
+tokens :: (Show t, Eq t) => [t] -> Parser t ()
+tokens [] = Done ()
+tokens (t : ts) = Read $ \t' -> case t == t' of
   False -> Fail $ "Expecting: " ++ show t ++ " Found: " ++ show t'
-  True -> word ts
+  True -> tokens ts
 
 test a b = case a of
     Nothing -> Nothing
     Just c -> case c of
-      Nothing -> Nothing <|>
+      Nothing -> r 
        Nothing
       Just d -> r 
-      where r = undefined
+      where r = undefined 
 
-test2 a b = case a of {Nothing -> b; Just a -> b }
+test2 a b = case case a of
+  True -> True 
+  False ->
+   case a of
+   True -> True
+   False -> False
+  of 
+  True -> a
+  False -> b
