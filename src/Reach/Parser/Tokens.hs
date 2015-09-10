@@ -4,6 +4,9 @@ module Reach.Parser.Tokens
     ConId,
     VarId,
     TypeId,
+    conId,
+    varId,
+    typeId,
     parseVarId,
     parseConId,
     parseTypeId,
@@ -19,6 +22,10 @@ import Control.Monad
 newtype ConId = ConId String deriving (Eq, Ord)
 newtype VarId = VarId String deriving (Eq, Ord)
 newtype TypeId = TypeId String deriving (Eq, Ord)
+
+conId (ConId c) = c
+varId (VarId v) = v
+typeId (TypeId t) = t
 
 instance Show ConId where show (ConId a) = show a
 instance Show VarId where show (VarId a) = show a

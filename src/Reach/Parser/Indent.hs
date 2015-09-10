@@ -17,6 +17,7 @@ import Control.Monad.Identity
 
 data ParseState = ParseState {indentLevel :: Int }
 type Parser a = ParsecT String ParseState Identity a
+type ParserT m a = ParsecT String ParseState m a
 
 parseTest :: Parser a -> String -> Either ParseError a
 parseTest p = runParser p startState ""  
