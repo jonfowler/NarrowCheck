@@ -1,5 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
-module Reach.Parser.Module where
+module Reach.Parser.Module (
+  module Reach.Parser.Tokens,
+  module Reach.Parser.Parse,
+  Module,
+  moduleData,
+  moduleDef,
+  moduleTypeDef,
+  moduleCon
+  )where
 
 import Reach.Parser.Tokens hiding ((<|>), many)
 import Reach.Parser.Parse hiding ((<|>), many)
