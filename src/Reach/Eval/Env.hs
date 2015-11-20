@@ -10,7 +10,7 @@ import Control.Lens
 data Env = Env {
   _funcs :: IntMap Func,
   _frees :: IntMap (CId, [CId]),
-  _env :: IntMap (
+  _env :: IntMap Expr,
   _nextVar :: LId
   }
 
