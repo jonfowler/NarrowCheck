@@ -13,7 +13,7 @@ data Expr
   = Let !LId Expr Expr
   | Fun {-# UNPACK #-} !FId
   | Var !LId
-  | App Expr Atom
+  | App Expr Expr 
   | Lam !LId Expr
   | Case Expr [Alt]
   | Con !CId [Atom]
