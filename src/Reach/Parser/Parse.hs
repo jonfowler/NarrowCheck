@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Reach.Parser.Parse where
 
 import Reach.Parser.Tokens
@@ -14,7 +12,7 @@ data Exp = Case Exp [Alt]
          | ConE ConId
          | Var VarId deriving (Show)
 
-data Alt = Alt {_altPattern :: (Con VarId), _altBody :: Exp} deriving (Show)
+data Alt = Alt {_altPattern :: Con VarId, _altBody :: Exp} deriving (Show)
 makeLenses ''Alt
 
 data Def = Def {_defName :: VarId, _defArgs :: [VarId], _defBody :: Exp} deriving (Show)

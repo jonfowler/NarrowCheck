@@ -1,4 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
 module Reach.Parser.Module (
   module Reach.Parser.Tokens,
   module Reach.Parser.Parse,

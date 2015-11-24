@@ -1,6 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Reach.Eval.Env where
+module Reach.Eval.Env (
+  Env(..),
+  funcs,frees,env,nextVar)
+  where
 
 import Reach.Eval.Expr
 

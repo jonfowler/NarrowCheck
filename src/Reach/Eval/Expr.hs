@@ -1,9 +1,9 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Reach.Eval.Expr where
 
-import Control.Lens
+import Control.Lens 
+import Data.DList
+
+import Control.Monad
 
 type LId = Int 
 type CId = Int 
@@ -16,7 +16,7 @@ data Expr
   | App Expr Expr 
   | Lam !LId Expr
   | Case Expr [Alt]
-  | Con !CId [Atom]
+  | Con !CId (DList Expr) 
 
 data Alt = Alt !CId [LId] Expr
 
@@ -28,6 +28,10 @@ data Func =
        }
 
 makeLenses ''Func
+
+
+
+
 
 -- An atom should either be a Var or (Con [Atom])
 

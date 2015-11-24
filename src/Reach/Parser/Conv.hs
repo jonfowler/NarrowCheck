@@ -8,9 +8,14 @@ import qualified Data.Map as M
 import Data.Map (Map)
 
 import Control.Lens
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.Except
+
+import Control.Applicative
 
 import qualified Reach.Parser.Module as S
-import Reach.Eval.Exp
+import Reach.Eval.Expr
 
 
 data Conv a = Conv
@@ -22,32 +27,53 @@ data Conv a = Conv
 makeLenses ''Conv
 
 data Convert = Convert {
-  _convertDef :: Conv S.VarId,
+  _convertFId :: Conv S.VarId,
   _convertCon :: Conv S.ConId,
   _convertLocals :: Conv S.VarId
                        }
 
 makeLenses ''Convert
 
-data ConvertM a = ConvertM {runConvert :: (Convert -> (a , Int))}
+newtype MaxInt = MaxInt Int deriving (Num)
 
-localVars :: (Conv S.VarId -> Conv S.VarId) -> ConvertM a -> ConvertM a
-localVars f (ConvertM m) = ConvertM $ m . (convertLocals %~ f)
+instance Monoid MaxInt where
+  mempty = 0
+  mappend (MaxInt m) (MaxInt n) = MaxInt (max m n)
+
+type ConvertM = ReaderT Convert (WriterT MaxInt (Except String))  --ConvertM {runConvert :: (Convert -> (a , Int))}
+
+viewConv :: Ord a => Getter Convert (Conv a) -> a -> ConvertM Int
+viewConv f vid = do
+  r <- view (f . mapToInt . at vid)
+  case r of
+    Just v -> return v
+    Nothing -> throwError ""
+
+convExpr :: S.Exp -> ConvertM Expr
+convExpr (S.Var vid) =  Var <$> viewConv convertLocals vid
+                    <|> Fun <$> viewConv convertFId vid
+                    <|> throwError "Variable is not in local or function names"
+convExpr (S.ConE cid) = Con <$> viewConv convertCon cid <|> throwError "Constructor does not exist"
+convExpr (S.App e e') = 
 
 
-instance Functor ConvertM where
-  fmap f (ConvertM r) = ConvertM (r & mapped . _1 %~ f)
+--localVars :: (Conv S.VarId -> Conv S.VarId) -> ConvertM a -> ConvertM a
+--localVars f (Convert m) = Convert $ m . (convertLocals %~ f)
 
-instance Applicative ConvertM where
-  pure a = ConvertM $ \c -> (a , c ^. convertLocals . nextInt)
-  ConvertM r <*> ConvertM r' = ConvertM (\c -> let (f , m) = r c
-                                                   (a , n) = r' c
-                                               in (f a, max m n))
 
-instance Monad ConvertM where
-  return = pure
-  ConvertM m >>= f = ConvertM $ \c -> let (a , p) = m c 
-                                      in runConvert (f a) c & _2 %~ max p
+--instance Functor ConvertM where
+--  fmap f (ConvertM r) = ConvertM (r & mapped . _1 %~ f)
+--
+--instance Applicative ConvertM where
+--  pure a = ConvertM $ \c -> (a , c ^. convertLocals . nextInt)
+--  ConvertM r <*> ConvertM r' = ConvertM (\c -> let (f , m) = r c
+--                                                   (a , n) = r' c
+--                                               in (f a, max m n))
+--
+--instance Monad ConvertM where
+--  return = pure
+--  ConvertM m >>= f = ConvertM $ \c -> let (a , p) = m c 
+--                                      in runConvert (f a) c & _2 %~ max p
 
 
 emptyConv :: Conv a
