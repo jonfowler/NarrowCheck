@@ -8,9 +8,9 @@ import qualified Data.Map as M
 import Data.Map (Map)
 
 import Control.Lens
-import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.State
 import Control.Monad.Except
+import qualified Data.DList as D
 
 import Control.Applicative
 
@@ -34,27 +34,60 @@ data Convert = Convert {
 
 makeLenses ''Convert
 
-newtype MaxInt = MaxInt Int deriving (Num)
+--newtype MaxInt = MaxInt Int deriving (Num)
+--
+--instance Monoid MaxInt where
+--  mempty = 0
+--  mappend (MaxInt m) (MaxInt n) = MaxInt (max m n)
 
-instance Monoid MaxInt where
-  mempty = 0
-  mappend (MaxInt m) (MaxInt n) = MaxInt (max m n)
-
-type ConvertM = ReaderT Convert (WriterT MaxInt (Except String))  --ConvertM {runConvert :: (Convert -> (a , Int))}
+type ConvertM = StateT Convert (Except String)  --ConvertM {runConvert :: (Convert -> (a , Int))}
 
 viewConv :: Ord a => Getter Convert (Conv a) -> a -> ConvertM Int
 viewConv f vid = do
-  r <- view (f . mapToInt . at vid)
+  r <- use (f . mapToInt . at vid)
   case r of
     Just v -> return v
     Nothing -> throwError ""
 
+viewCons :: S.ConId -> ConvertM Int
+viewCons cid = viewConv convertCon cid
+                     <|> throwError ("Constructor " ++ show cid ++ " does not exist")
+
 convExpr :: S.Exp -> ConvertM Expr
 convExpr (S.Var vid) =  Var <$> viewConv convertLocals vid
                     <|> Fun <$> viewConv convertFId vid
-                    <|> throwError "Variable is not in local or function names"
-convExpr (S.ConE cid) = Con <$> viewConv convertCon cid <|> throwError "Constructor does not exist"
-convExpr (S.App e e') = 
+                    <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
+convExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
+                     <|> throwError ("Constructor " ++ show cid ++ " does not exist")
+convExpr (S.App e e') = App <$> (convExpr e) <*> (convExpr e') 
+convExpr (S.Parens e) = convExpr e
+convExpr (S.Case e as) = do
+  e' <- convExpr e
+  as' <- mapM convAlt as
+  return (Case e' as')
+
+
+convAlt :: S.Alt -> ConvertM Alt
+convAlt (S.Alt (S.Con cid xs)  e) = do
+  cs <- viewCons cid
+  vs <- mapM (overConv convertLocals) xs
+  e' <- convExpr e
+  return (Alt cs vs e') 
+
+overConv :: Ord a => Simple Lens Convert (Conv a) -> a -> ConvertM Int
+overConv l a = do
+     i <- use (l . nextInt)
+     l . mapToInt . at a ?= i
+     l . mapFromInt . at i ?= a
+     l . nextInt .= i + 1
+     return i
+
+updConv :: Ord a => Simple Lens Convert (Conv a) -> a -> ConvertM Int
+updConv l a = do
+     r <- use (l . mapToInt . at a)
+     case r of
+       Nothing -> overConv l a 
+       Just i -> return i
 
 
 --localVars :: (Conv S.VarId -> Conv S.VarId) -> ConvertM a -> ConvertM a
@@ -89,10 +122,3 @@ emptyConv = Conv
 --toInt :: Ord a => Conv a -> a -> Maybe Int
 --toInt c a = M.lookup a (mapToInt c) 
 --
---addVal :: Ord a =>  a -> Conv a -> (Int, Conv a)
---addVal a c = case toInt c a of
---  Just i -> (i, c)
---  Nothing -> let i = nextInt c in
---    (i, c { mapToInt = M.insert a i (mapToInt c)
---          , mapFromInt = I.insert i a (mapFromInt c)
---          , nextInt = i + 1 })
