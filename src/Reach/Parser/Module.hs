@@ -39,7 +39,7 @@ addData :: Data -> StateT Module (Except String) ()
 addData d = do
   a <- use (moduleData . at tid)
   case a of
-    Just _ -> throwError $ "Type "++ typeId tid ++ " already defined\n"
+    Just _ -> throwError $ "Type "++ tid ++ " already defined\n"
     Nothing -> do moduleData . at tid ?= d
                   sequence_ (addCon <$> (d ^. dataCon))
  where tid = d ^. dataName
@@ -50,7 +50,7 @@ addDef :: Def -> StateT Module (Except String) ()
 addDef d = do
   a <- use (moduleDef . at vid)
   case a of
-    Just _ -> throwError $ "Variable " ++ varId vid ++ " already defined\n"
+    Just _ -> throwError $ "Variable " ++ vid ++ " already defined\n"
     Nothing -> moduleDef . at vid ?= d
  where vid = d ^. defName
 
@@ -58,7 +58,7 @@ addTypeDef :: TypeDef -> StateT Module (Except String) ()
 addTypeDef d = do
   a <- use (moduleTypeDef . at vid)
   case a of
-    Just _ -> throwError $ "Type of variable " ++ varId vid ++ " already defined\n"
+    Just _ -> throwError $ "Type of variable " ++ vid ++ " already defined\n"
     Nothing -> moduleTypeDef . at vid ?= d
  where vid = d ^. typeDefName
 
@@ -66,7 +66,7 @@ addCon :: Con Type -> StateT Module (Except String) ()
 addCon d = do
   a <- use (moduleCon . at cid)
   case a of
-    Just _ -> throwError $ "Constructor " ++ conId cid ++ " already defined\n"
+    Just _ -> throwError $ "Constructor " ++ cid ++ " already defined\n"
     Nothing -> moduleCon . at cid ?= d
  where cid = d ^. conName
 
@@ -107,7 +107,7 @@ checkTypeDefs m = sequence_ (fmap (checkTypeDef m) (m ^. moduleTypeDef))
 
 checkTypeDef :: Module -> TypeDef -> Except String ()
 checkTypeDef m td = case M.lookup (td ^. typeDefName) (m ^. moduleDef) of
-  Nothing -> throwError $ "Type definition for " ++ varId (td ^. typeDefName) ++ " has no corresponding definiton\n"
+  Nothing -> throwError $ "Type definition for " ++ td ^. typeDefName ++ " has no corresponding definiton\n"
   Just _ -> return () 
 
 checkTypeScopes :: Module -> Except String ()
@@ -122,7 +122,7 @@ checkTypeScope :: Module -> Type -> Except String ()
 checkTypeScope m (s :-> t) =  checkTypeScope m s >> checkTypeScope m t
 checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
   Just _ -> return () 
-  Nothing -> throwError $ "Type " ++ typeId tid ++ " not in scope\n"
+  Nothing -> throwError $ "Type " ++ tid ++ " not in scope\n"
 
 checkScopes :: Module -> Except String ()
 checkScopes m = mapMOf_ (moduleDef . folded) (checkScopeDef m) m 
@@ -150,14 +150,14 @@ checkScope m locals vid = case M.lookup vid (m ^. moduleDef) of
   Just _ -> return ()
   Nothing -> case M.lookup vid locals of
     Just _ -> return ()
-    Nothing -> throwError $ "Variable " ++ varId vid ++ " not in scope\n"
+    Nothing -> throwError $ "Variable " ++ vid ++ " not in scope\n"
 
 
 checkLocal :: Module -> Map VarId () -> VarId -> Except String (Map VarId ()) 
 checkLocal m locals vid = case M.lookup vid (m ^. moduleDef) of
-  Just _ -> throwError $ "Local variable " ++ varId vid ++ " already in use\n"
+  Just _ -> throwError $ "Local variable " ++ vid ++ " already in use\n"
   Nothing -> case M.lookup vid locals of
-    Just _ -> throwError $ "Local variable " ++ varId vid ++ " already in use\n"
+    Just _ -> throwError $ "Local variable " ++ vid ++ " already in use\n"
     Nothing -> return (M.insert vid () locals) 
 
 

@@ -4,9 +4,6 @@ module Reach.Parser.Tokens
     ConId,
     VarId,
     TypeId,
-    conId,
-    varId,
-    typeId,
     parseVarId,
     parseConId,
     parseTypeId,
@@ -19,17 +16,9 @@ module Reach.Parser.Tokens
 import Reach.Parser.Indent
 import Control.Monad
 
-newtype ConId = ConId String deriving (Eq, Ord)
-newtype VarId = VarId String deriving (Eq, Ord)
-newtype TypeId = TypeId String deriving (Eq, Ord)
-
-conId (ConId c) = c
-varId (VarId v) = v
-typeId (TypeId t) = t
-
-instance Show ConId where show (ConId a) = show a
-instance Show VarId where show (VarId a) = show a
-instance Show TypeId where show (TypeId a) = show a
+type ConId = String 
+type VarId = String 
+type TypeId = String
 
 reservedT :: [String]
 reservedT = ["case", "of", "data"]
@@ -52,13 +41,13 @@ reserved :: String -> Parser ()
 reserved x = lexeme (word x)
 
 parseVarId :: Parser VarId 
-parseVarId = VarId <$> (lexeme $ ((:) <$> lower <*> many alphaNum) >>= notReserved)
+parseVarId = lexeme $ ((:) <$> lower <*> many alphaNum) >>= notReserved
 
 parseConId :: Parser ConId 
-parseConId = ConId <$> (lexeme $ ((:) <$> upper <*> many alphaNum) >>= notReserved)
+parseConId = lexeme $ ((:) <$> upper <*> many alphaNum) >>= notReserved
 
 parseTypeId :: Parser TypeId 
-parseTypeId = TypeId <$> (lexeme $ ((:) <$> upper <*> many alphaNum) >>= notReserved)
+parseTypeId = lexeme $ ((:) <$> upper <*> many alphaNum) >>= notReserved
 
 whitespace :: Parser ()
 whitespace = void . many . oneOf $ " \n"

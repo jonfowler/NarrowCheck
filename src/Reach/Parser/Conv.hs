@@ -6,6 +6,7 @@ import qualified Data.IntMap as I
 import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
+import Data.Maybe
 
 import Control.Lens
 import Control.Monad.State
@@ -16,7 +17,7 @@ import Control.Applicative
 
 import qualified Reach.Parser.Module as S
 import Reach.Eval.Expr
-
+import Reach.Eval.Env
 
 data Conv a = Conv
   { _mapToInt :: Map a Int
@@ -53,6 +54,42 @@ viewCons :: S.ConId -> ConvertM Int
 viewCons cid = viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")
 
+setupConvert :: S.Module -> Convert 
+setupConvert m = Convert
+  { _convertFId = execState (setupConv (M.keys $ m ^. S.moduleDef)) emptyConv,
+    _convertCon = execState (setupConv (M.keys $ m ^. S.moduleCon)) emptyConv,
+    _convertLocals = emptyConv
+  }
+
+setupConv :: Ord a => [a] -> State (Conv a) ()
+setupConv as = foldM_ (\_ v -> overConv id v) 0 as
+                     
+convModule :: S.Module -> Env
+convModule m = Env {
+             _funcs = I.fromList $ map (convFun c) (M.elems $ m ^. S.moduleDef),
+             _frees = I.empty,
+             _env = I.empty,
+             _nextVar = 0,
+             _funcNames = c ^. convertFId . mapFromInt,
+             _constrNames = c ^. convertCon . mapFromInt 
+             }
+  where c = setupConvert m
+
+convFun :: Convert -> S.Def ->  (FId, Func)
+convFun c def = case runExcept . runStateT s $ c of
+  Left e -> error e
+  Right (e , c') -> (
+    fromMaybe (error "Function not found") (c ^. convertFId . mapToInt . at (def ^. S.defName)) ,
+    Func {_body = e, _vars = (c ^. convertLocals . nextInt)})
+ where s = convArgs (def ^. S.defArgs) <*> convExpr (def ^. S.defBody)
+
+convArgs :: [S.VarId] -> ConvertM (Expr -> Expr)
+convArgs [] = return id
+convArgs (v : vs) = do
+  i <- overConv convertLocals v 
+  f <- convArgs vs
+  return (Lam i . f)
+
 convExpr :: S.Exp -> ConvertM Expr
 convExpr (S.Var vid) =  Var <$> viewConv convertLocals vid
                     <|> Fun <$> viewConv convertFId vid
@@ -74,7 +111,7 @@ convAlt (S.Alt (S.Con cid xs)  e) = do
   e' <- convExpr e
   return (Alt cs vs e') 
 
-overConv :: Ord a => Simple Lens Convert (Conv a) -> a -> ConvertM Int
+overConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int
 overConv l a = do
      i <- use (l . nextInt)
      l . mapToInt . at a ?= i
@@ -82,7 +119,7 @@ overConv l a = do
      l . nextInt .= i + 1
      return i
 
-updConv :: Ord a => Simple Lens Convert (Conv a) -> a -> ConvertM Int
+updConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int
 updConv l a = do
      r <- use (l . mapToInt . at a)
      case r of

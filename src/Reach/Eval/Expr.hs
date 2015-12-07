@@ -16,10 +16,15 @@ data Expr
   | App Expr Expr 
   | Lam !LId Expr
   | Case Expr [Alt]
-  | Con !CId (DList Expr) 
+
+  -- A constructors arguments should be atoms: either a variable or
+  -- further atoms. This is for efficiency, ensuring every expression
+  -- is only evaluated once.
+  | Con !CId (DList Atom) 
 
 data Alt = Alt !CId [LId] Expr
 
+-- Atoms are nested constructors with variables at their leaves.
 type Atom = Expr
 
 data Func =

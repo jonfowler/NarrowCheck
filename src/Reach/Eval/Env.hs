@@ -14,7 +14,10 @@ data Env = Env {
   _funcs :: IntMap Func,
   _frees :: IntMap (CId, [CId]),
   _env :: IntMap Expr,
-  _nextVar :: LId
+  _nextVar :: LId,
+
+  _funcNames :: IntMap String,
+  _constrNames :: IntMap String
   }
 
 makeLenses ''Env
