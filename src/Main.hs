@@ -43,9 +43,11 @@ go fn flags = do
   rf <- readFile fn
   m <- parseModule rf
   checkModule m
+  putStrLn (show m)
   let env = convModule m
       fid = env ^. funcIds .at' "main"
-  (res, env') <- runReach (inlineFunc fid >>= eval) env
+  putStrLn (show env)
+  (res, env') <- runReach (inlineFunc fid >>= deepEval) env
   putStrLn (showExpr res env')
 --  case runExcept $ conv a of
 --    Left e -> print e

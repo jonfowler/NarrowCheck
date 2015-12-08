@@ -76,6 +76,6 @@ parseApp = toApp <$> many1 parseInnerExp  --parseInnerExp
 toApp :: [Exp] -> Exp
 toApp = go . reverse
   where go [e] = e
-        go (e : es) = App (toApp es) e
+        go (e : es) = App (go es) e
 
 

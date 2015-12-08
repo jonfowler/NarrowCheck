@@ -3,6 +3,8 @@ module Reach.Eval.Basic where
 import Reach.Eval.Env
 import Reach.Eval.Expr
 import Reach.Eval.Monad
+
+import Debug.Trace
 import Control.Lens hiding (snoc)
 import qualified Data.DList as D 
 
@@ -12,6 +14,12 @@ runReach m s = case runExcept (runStateT m s) of
   Right a -> return a
   
 
+deepEval :: Expr -> ReachT Identity Expr
+deepEval e = do
+  Con cid es <- eval e
+  env <- get
+  vs <- trace (show es) . trace (show env) $ mapM deepEval (D.toList es)
+  return (Con cid (D.fromList vs))
        
 eval :: Expr -> ReachT Identity Expr
 eval (Let x e e')  = do
@@ -22,7 +30,7 @@ eval (Let x e e')  = do
       env . at x ?= e 
       eval e'
 
-eval (Fun fid) = inlineFunc fid
+eval (Fun fid) = inlineFunc fid >>= eval
 
 eval (Var x) = do
   a <- use (env . at x)
@@ -52,7 +60,7 @@ match (Con cid es) (Alt cid' xs e : as)
   | cid == cid' = binds xs (D.toList es) >> return e 
   | otherwise   = match (Con cid es) as
 match _ [] = error "no match for constructor in case"
-match _ _ = error "case subject did not evaluate to constructor"
+match e _ = error $ "case subject did not evaluate to constructor: " ++ show e
 
 binds :: Monad m => [LId] -> [Expr] -> ReachT m ()
 binds (x : xs) (e : es) = bind x e >> binds xs es
@@ -100,8 +108,6 @@ Case e as +<< i = Case (e +<< i) (map incAlt as)
     where incAlt (Alt cid xs e') = Alt cid (map (+i) xs) e'
 Con cid es +<< i = Con cid (fmap (+<< i) es)
 
-(+@<<) :: Alt -> Int -> Expr 
-a +@<< i = undefined
 
 --data Func =
 --  Func {_body :: Expr,

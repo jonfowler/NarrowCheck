@@ -24,13 +24,13 @@ data Env = Env {
   _funcNames :: IntMap String,
   _funcIds :: Map String FId,
   _constrNames :: IntMap String
-  }
+  } deriving Show
 
 makeLenses ''Env
 
 showExpr :: Expr -> Env -> String
 showExpr (Con cid es) env = env ^. constrNames . at' cid ++ showEs (D.toList es) env
-showExpr _ _ = "Can't show no constructor value"
+showExpr e _ = "Can't show non constructor value: " ++ show e
 
 showEs :: [Expr] -> Env -> String
 showEs [] _ = ""
