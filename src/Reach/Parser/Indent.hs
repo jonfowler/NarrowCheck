@@ -1,6 +1,5 @@
 module Reach.Parser.Indent (
-  parseTest,
-  parseFile,
+  runParse,
   block,
   checkIndent,
   localIndent,
@@ -19,11 +18,8 @@ data ParseState = ParseState {indentLevel :: Int }
 type Parser a = ParsecT String ParseState Identity a
 type ParserT m a = ParsecT String ParseState m a
 
-parseTest :: Parser a -> String -> Either ParseError a
-parseTest p = runParser p startState ""  
-
-parseFile :: Show a =>  Parser a -> String -> IO (Either ParseError a)
-parseFile p file =  (parseTest p <$> readFile file)
+runParse :: Parser a -> String -> Either ParseError a
+runParse p = runParser p startState ""  
 
 startState :: ParseState
 startState = ParseState {indentLevel = 1}

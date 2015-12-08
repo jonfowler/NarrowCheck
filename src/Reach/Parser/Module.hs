@@ -1,11 +1,15 @@
 module Reach.Parser.Module (
   module Reach.Parser.Tokens,
   module Reach.Parser.Parse,
+
   Module,
   moduleData,
   moduleDef,
   moduleTypeDef,
-  moduleCon
+  moduleCon,
+
+  parseModule,
+  checkModule
   )where
 
 import Reach.Parser.Tokens hiding ((<|>), many)
@@ -82,24 +86,37 @@ addCon d = do
 conToType :: Con Type -> TypeId -> Type
 conToType (Con _ ts) tid = foldr (:->) (Type tid) ts
 
-parseModule :: Parser (Except String Module)
-parseModule = whitespace >> execStateT <$> parseModule' <*> pure emptyModule
+parserOfModule :: Parser (Except String Module)
+parserOfModule = whitespace >> execStateT <$> parseModule' <*> pure emptyModule
    where parseModule' = sequence_ <$> many (
                    addData <$> parseData
                <|> addDef <$> parseDef
                <|> addTypeDef <$> parseTypeDef)
 
-loadModule :: Parser (Either String Module)
-loadModule = runExcept <$> do
-  errorm <-parseModule
-  return $ checks errorm
-    where
-      checks :: Except String Module -> Except String Module
-      checks em = do
-             m <- em 
-             checkTypeDefs m
-             checkScopes m
-             return m
+parseModule :: Monad m => String -> m Module
+parseModule s = case runParse parserOfModule s of
+  Left err -> fail . show $ err
+  Right m -> case runExcept m of 
+    Left err -> fail err
+    Right m -> return m
+
+checkModule :: Monad m => Module -> m ()
+checkModule m = case runExcept (checkTypeDefs m >> checkScopes m) of
+  Left err -> fail err
+  Right _ -> return ()
+  
+         
+--loadModule :: Parser (Either String Module)
+--loadModule = runExcept <$> do
+--  errorm <-parseModule
+--  return $ checks errorm
+--    where
+--      checks :: Except String Module -> Except String Module
+--      checks em = do
+--             m <- em 
+--             checkTypeDefs m
+--             checkScopes m
+--             return m
 
 
 checkTypeDefs :: Module -> Except String ()

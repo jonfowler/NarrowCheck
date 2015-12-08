@@ -8,7 +8,11 @@ module Reach.Eval.Env (
 import Reach.Eval.Expr
 
 import Data.IntMap
-import Control.Lens
+import qualified Data.Map as M
+import Data.Map (Map)
+import Reach.Lens
+
+import Data.DList
 
 data Env = Env {
   _funcs :: IntMap Func,
@@ -17,8 +21,17 @@ data Env = Env {
   _nextVar :: LId,
 
   _funcNames :: IntMap String,
+  _funcIds :: Map String FId,
   _constrNames :: IntMap String
   }
+
+showExpr :: Expr -> Env -> String
+showExpr (Con cid es) env = env ^. constrNames . at' cid ++ showEs es env
+showExpr _ _ = "Can't show no constructor value"
+
+showEs :: Expr -> Env -> String
+showEs [] _ = ""
+showEs (e : es) env = " ( " ++ showExpr e env ++ " )" ++ showEs es env
 
 makeLenses ''Env
 

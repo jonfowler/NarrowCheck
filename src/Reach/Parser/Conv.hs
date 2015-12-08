@@ -127,35 +127,9 @@ updConv l a = do
        Just i -> return i
 
 
---localVars :: (Conv S.VarId -> Conv S.VarId) -> ConvertM a -> ConvertM a
---localVars f (Convert m) = Convert $ m . (convertLocals %~ f)
-
-
---instance Functor ConvertM where
---  fmap f (ConvertM r) = ConvertM (r & mapped . _1 %~ f)
---
---instance Applicative ConvertM where
---  pure a = ConvertM $ \c -> (a , c ^. convertLocals . nextInt)
---  ConvertM r <*> ConvertM r' = ConvertM (\c -> let (f , m) = r c
---                                                   (a , n) = r' c
---                                               in (f a, max m n))
---
---instance Monad ConvertM where
---  return = pure
---  ConvertM m >>= f = ConvertM $ \c -> let (a , p) = m c 
---                                      in runConvert (f a) c & _2 %~ max p
-
-
 emptyConv :: Conv a
 emptyConv = Conv
   { _mapToInt = M.empty,
     _mapFromInt = I.empty,
     _nextInt = 0
   }
-
---fromInt :: Conv a -> Int -> Maybe a
---fromInt c i = I.lookup i (mapFromInt c) 
---
---toInt :: Ord a => Conv a -> a -> Maybe Int
---toInt c a = M.lookup a (mapToInt c) 
---
