@@ -70,7 +70,10 @@ convModule m = Env {
              _frees = I.empty,
              _env = I.empty,
              _nextVar = 0,
+
              _funcNames = c ^. convertFId . mapFromInt,
+             _funcIds = c ^. convertFId . mapToInt,
+
              _constrNames = c ^. convertCon . mapFromInt 
              }
   where c = setupConvert m

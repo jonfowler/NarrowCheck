@@ -14,9 +14,9 @@ import Reach.Eval.Env
 data ReachFail
   = DataLimitFail
   | RecLimitFail
-  | ConstraintFail
+  | ConstraintFail deriving Show
 
-type ReachT m = ExceptT ReachFail (StateT Env m)
+type ReachT m = StateT Env (ExceptT ReachFail m)
 
 
 

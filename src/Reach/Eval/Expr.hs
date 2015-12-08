@@ -1,6 +1,6 @@
 module Reach.Eval.Expr where
 
-import Reach.Lens 
+import Reach.Lens
 import Data.DList
 
 import Control.Monad

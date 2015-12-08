@@ -2,8 +2,12 @@
 
 import Reach.Parser.Module
 import Reach.Parser.Conv
+import Reach.Eval.Basic
+import Reach.Eval.Env
+import Reach.Lens
+      
+       
 import Control.Monad.Except
-
 --import Reach.Eval.Basic
 --import Reach.Eval.Forward
 --import Reach.Eval
@@ -40,7 +44,9 @@ go fn flags = do
   m <- parseModule rf
   checkModule m
   let env = convModule m
-  putStrLn "Success" 
+      fid = env ^. funcIds .at' "main"
+  (res, env') <- runReach (inlineFunc fid >>= eval) env
+  putStrLn (showExpr res env')
 --  case runExcept $ conv a of
 --    Left e -> print e
 --    Right fs -> do

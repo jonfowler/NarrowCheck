@@ -4,7 +4,13 @@ import Reach.Eval.Env
 import Reach.Eval.Expr
 import Reach.Eval.Monad
 import Control.Lens hiding (snoc)
-import Data.DList hiding (map)
+import qualified Data.DList as D 
+
+runReach :: Monad m => ReachT Identity a -> Env -> m (a , Env)
+runReach m s = case runExcept (runStateT m s) of
+  Left err -> fail . show $ err
+  Right a -> return a
+  
 
        
 eval :: Expr -> ReachT Identity Expr
@@ -33,7 +39,7 @@ eval (App f e) = do
     Lam x e' -> do
       env . at x ?= e
       eval e'
-    Con cid es -> return (Con cid (snoc es e))
+    Con cid es -> return (Con cid (D.snoc es e))
     _ -> error "function evaluated to non lambda"
 eval (Case e as) = do
   v <- eval e
@@ -43,7 +49,7 @@ eval v = return v
 
 match :: Monad m => Expr -> [Alt] -> ReachT m Expr
 match (Con cid es) (Alt cid' xs e : as)
-  | cid == cid' = binds xs es >> return e 
+  | cid == cid' = binds xs (D.toList es) >> return e 
   | otherwise   = match (Con cid es) as
 match _ [] = error "no match for constructor in case"
 match _ _ = error "case subject did not evaluate to constructor"
@@ -51,7 +57,7 @@ match _ _ = error "case subject did not evaluate to constructor"
 binds :: Monad m => [LId] -> [Expr] -> ReachT m ()
 binds (x : xs) (e : es) = bind x e >> binds xs es
 binds [] [] = return ()
-binds _ _ = error "Constructor / Alterencative variable mismatch"
+binds _ _ = error "Constructor / Alterenative variable mismatch"
 
 bind :: Monad m => LId -> Expr -> ReachT m ()
 bind x e = do

@@ -2,6 +2,6 @@
 data Boolean = True | False
 
 
-test = case True of
+main = case True of
   True -> False
   False -> True
