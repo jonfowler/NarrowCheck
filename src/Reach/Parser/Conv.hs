@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Reach.Parser.Conv where
 
 import qualified Data.IntMap as I
@@ -94,7 +92,7 @@ convArgs (v : vs) = do
   return (Lam i . f)
 
 convExpr :: S.Exp -> ConvertM Expr
-convExpr (S.Var vid) =  Var <$> viewConv convertLocals vid
+convExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
                     <|> Fun <$> viewConv convertFId vid
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
 convExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid

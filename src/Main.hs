@@ -3,6 +3,7 @@
 import Reach.Parser.Module
 import Reach.Parser.Conv
 import Reach.Eval.Basic
+import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
       
@@ -47,7 +48,7 @@ go fn flags = do
   let env = convModule m
       fid = env ^. funcIds .at' "main"
   putStrLn (show env)
-  (res, env') <- runReach (inlineFunc fid >>= deepEval) env
+  (res, env') <- runReach (deepEval (Fun fid)) env
   putStrLn (showExpr res env')
 --  case runExcept $ conv a of
 --    Left e -> print e

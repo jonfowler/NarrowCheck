@@ -6,13 +6,15 @@ import Data.DList
 import Control.Monad
 
 type LId = Int 
+type EId = Int
 type CId = Int 
 type FId = Int
 
 data Expr
   = Let !LId Expr Expr
   | Fun {-# UNPACK #-} !FId
-  | Var !LId
+  | EVar !EId
+  | LVar !LId
   | App Expr Expr 
   | Lam !LId Expr
   | Case Expr [Alt] 
