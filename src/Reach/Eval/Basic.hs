@@ -18,7 +18,8 @@ deepEval :: Expr -> ReachT Identity Expr
 deepEval e = do
   Con cid es <- eval e
   env <- get
-  vs <- trace (show es) . trace (show env) $ mapM deepEval (D.toList es)
+  vs <- --trace (show es) . trace (show env) $
+          mapM deepEval (D.toList es)
   return (Con cid (D.fromList vs))
        
 eval :: Expr -> ReachT Identity Expr
@@ -30,7 +31,9 @@ eval (Let x e e')  = do
       env . at x ?= e 
       eval e'
 
-eval (Fun fid) = inlineFunc fid >>= eval
+eval (Fun fid) = do
+  f <- inlineFunc fid
+  trace (show f) $ eval f
 
 eval (Var x) = do
   a <- use (env . at x)
@@ -50,7 +53,7 @@ eval (App f e) = do
     Con cid es -> return (Con cid (D.snoc es e))
     _ -> error "function evaluated to non lambda"
 eval (Case e as) = do
-  v <- eval e
+  v <- trace (show $ Case e as) $ eval e
   e' <- match v as
   eval e'
 eval v = return v
@@ -74,29 +77,16 @@ bind x e = do
     Just _ -> error "Variable already bound"
     Nothing -> env . at x ?= e
 
---             data Expr
---  = Let !LId Expr Expr
---  | Fun {-# UNPACK #-} !FId
---  | Var !LId
---  | App Expr Expr 
---  | Case Expr [Alt]
---  | Lam !LId Expr
---  | Con !CId (DList Expr) 
-
-
-
-
-
---evalApp :: Moand m => Expr -> [Expr] -> ReachT m Expr
-       
-
 
 inlineFunc :: Monad m => FId -> ReachT m Expr
 inlineFunc fid = do
   Just f <- use (funcs.at fid)
-  i <- use nextVar
-  nextVar .= i + f ^. vars 
+  i <- trace (show f) $ use nextVar
+  nextVar .= trace2 (i + f ^. vars + 5)
   return ((f ^. body) +<< i)
+
+trace2 :: Show a => a -> a
+trace2 a = trace (show a) a
 
 (+<<) :: Expr -> Int -> Expr 
 Let x e e' +<< i = Let (x + i) (e +<< i) (e' +<< i)
@@ -105,7 +95,7 @@ Var x +<< i = Var (x + i)
 App e e' +<< i = App (e +<< i) (e' +<< i)  
 Lam x e +<< i = Lam (x + i) (e +<< i)
 Case e as +<< i = Case (e +<< i) (map incAlt as)
-    where incAlt (Alt cid xs e') = Alt cid (map (+i) xs) e'
+    where incAlt (Alt cid xs e') = Alt cid (map (+i) xs) (e' +<< i)
 Con cid es +<< i = Con cid (fmap (+<< i) es)
 
 
