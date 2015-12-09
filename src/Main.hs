@@ -7,11 +7,7 @@ import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
       
-       
 import Control.Monad.Except
---import Reach.Eval.Basic
---import Reach.Eval.Forward
---import Reach.Eval
 
 import System.Environment
 import System.Console.GetOpt

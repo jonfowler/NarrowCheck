@@ -5,7 +5,6 @@ import Reach.Eval.Env
 import Reach.Eval.Expr
 import Reach.Eval.Monad
 
-import Debug.Trace
 import qualified Data.DList as D 
 
 runReach :: Monad m => ReachT Identity a -> Env -> m (a , Env)
@@ -18,8 +17,7 @@ deepEval :: Expr -> ReachT Identity Expr
 deepEval e = do
   Con cid es <- eval e
   env <- get
-  vs <- --trace (show es) . trace (show env) $
-          mapM deepEval (D.toList es)
+  vs <- mapM deepEval (D.toList es)
   return (Con cid (D.fromList vs))
        
 eval :: Expr -> ReachT Identity Expr
@@ -29,9 +27,7 @@ eval (Let x e e')  = do
     Just _ -> error "variable already bound"
     Nothing -> bind x e e' >>= eval 
 
-eval (Fun fid) = do
-  f <- use (funcs . at' fid . body)
-  trace (show f) $ eval f
+eval (Fun fid) = use (funcs . at' fid . body) >>= eval 
 
 eval (EVar x) = do
   a <- use (env . at x)
@@ -49,7 +45,7 @@ eval (App f e) = do
     Con cid es -> return (Con cid (D.snoc es e))
     _ -> error "function evaluated to non lambda"
 eval (Case e as) = do
-  v <- trace (show $ Case e as) $ eval e
+  v <- eval e
   e' <- match v as
   eval e'
 eval v = return v
@@ -75,19 +71,6 @@ bind x e e' = do
   env . at ex ?= e
   return (replaceLVar x ex e')
   
-
-
---inlineFunc :: Monad m => FId -> ReachT m Expr
---inlineFunc fid = do
---  Just f <- use (funcs.at fid)
---  i <- trace (show f) $ use nextVar
---  nextVar .= trace2 (i + f ^. vars + 5)
---  return ((f ^. body) +<< i)
-
-trace2 :: Show a => a -> a
-trace2 a = trace (show a) a
-
-
 replaceLVar :: LId -> EId -> Expr -> Expr 
 replaceLVar lx ex (Let x e e') = Let x (replaceLVar lx ex e) (replaceLVar lx ex e')
 replaceLVar lx ex (Fun f) = Fun f
@@ -101,23 +84,3 @@ replaceLVar lx ex (Case e as) = Case (replaceLVar lx ex e) (map replaceAlt as)
     where replaceAlt (Alt cid xs e') = Alt cid xs (replaceLVar lx ex e')
 replaceLVar lx ex (Con cid es) = Con cid (fmap (replaceLVar lx ex) es)
    
---Let x e e' +<< i = Let (x + i) (e +<< i) (e' +<< i)
---Fun f +<< _ = Fun f
---Var x +<< i = Var (x + i)
---App e e' +<< i = App (e +<< i) (e' +<< i)  
---Lam x e +<< i = Lam (x + i) (e +<< i)
---Case e as +<< i = Case (e +<< i) (map incAlt as)
---    where incAlt (Alt cid xs e') = Alt cid (map (+i) xs) (e' +<< i)
---Con cid es +<< i = Con cid (fmap (+<< i) es)
-
-
---data Func =
---  Func {_body :: Expr,
---        _vars :: Int
---       }
-
- 
-
-
-
---eval 
