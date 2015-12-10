@@ -8,13 +8,23 @@ import Control.Monad
 type LId = Int 
 type EId = Int
 type CId = Int 
+type FuncId = Int
 type FId = Int
 
 data Expr
   = Let !LId Expr Expr
-  | Fun {-# UNPACK #-} !FId
+  | Fun {-# UNPACK #-} !FuncId
+
+  -- Environment variables are the variables used to implement
+  -- call by need evaluation.
   | EVar !EId
+
+  -- The "local" variables are variables scoped by lambdas, they
+  -- are converted to environment variables when they are bound.
   | LVar !LId
+
+  -- FVar's are the free variables
+  | FVar !FId
   | App Expr Expr 
   | Lam !LId Expr
   | Case Expr [Alt] 

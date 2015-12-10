@@ -26,7 +26,7 @@ data Conv a = Conv
 makeLenses ''Conv
 
 data Convert = Convert {
-  _convertFId :: Conv S.VarId,
+  _convertFuncId :: Conv S.VarId,
   _convertCon :: Conv S.ConId,
   _convertLocals :: Conv S.VarId
                        }
@@ -54,7 +54,7 @@ viewCons cid = viewConv convertCon cid
 
 setupConvert :: S.Module -> Convert 
 setupConvert m = Convert
-  { _convertFId = execState (setupConv (M.keys $ m ^. S.moduleDef)) emptyConv,
+  { _convertFuncId = execState (setupConv (M.keys $ m ^. S.moduleDef)) emptyConv,
     _convertCon = execState (setupConv (M.keys $ m ^. S.moduleCon)) emptyConv,
     _convertLocals = emptyConv
   }
@@ -69,18 +69,18 @@ convModule m = Env {
              _env = I.empty,
              _nextVar = 0,
 
-             _funcNames = c ^. convertFId . mapFromInt,
-             _funcIds = c ^. convertFId . mapToInt,
+             _funcNames = c ^. convertFuncId . mapFromInt,
+             _funcIds = c ^. convertFuncId . mapToInt,
 
              _constrNames = c ^. convertCon . mapFromInt 
              }
   where c = setupConvert m
 
-convFun :: Convert -> S.Def ->  (FId, Func)
+convFun :: Convert -> S.Def ->  (FuncId, Func)
 convFun c def = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (
-    fromMaybe (error "Function not found") (c' ^. convertFId . mapToInt . at (def ^. S.defName)) ,
+    fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at (def ^. S.defName)) ,
     Func {_body = e, _vars = (c' ^. convertLocals . nextInt)})
  where s = convArgs (def ^. S.defArgs) <*> convExpr (def ^. S.defBody)
 
@@ -93,7 +93,7 @@ convArgs (v : vs) = do
 
 convExpr :: S.Exp -> ConvertM Expr
 convExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
-                    <|> Fun <$> viewConv convertFId vid
+                    <|> Fun <$> viewConv convertFuncId vid
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
 convExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")

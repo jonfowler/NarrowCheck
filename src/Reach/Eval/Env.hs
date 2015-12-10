@@ -16,12 +16,12 @@ import qualified Data.DList as D
 
 data Env = Env {
   _funcs :: IntMap Func,
-  _frees :: IntMap (CId, [CId]),
+  _frees :: IntMap (CId, D.DList FId),
   _env :: IntMap Expr,
   _nextVar :: LId,
 
   _funcNames :: IntMap String,
-  _funcIds :: Map String FId,
+  _funcIds :: Map String FuncId,
   _constrNames :: IntMap String
   } deriving Show
 
