@@ -1,6 +1,8 @@
 module Reach.Eval.Expr where
 
-import Reach.Lens
+--import Reach.Lens
+
+import Control.Lens
 import Data.DList
 
 import Control.Monad
@@ -46,10 +48,5 @@ data Func =
 
 makeLenses ''Func
 
-
-
-
-
--- An atom should either be a Var or (Con [Atom])
 
 
