@@ -3,7 +3,8 @@ module Reach.Eval.Monad (
   module X,
   ReachT,
   ReachFail(..),
-  MonadChoice(..)
+  MonadFork(..),
+  Tree(..)
   ) where
 
 import Control.Monad.State as X
@@ -69,11 +70,17 @@ instance MonadFork (Tree i t) where
   type ForkTag (Tree i t) = t
   fork i ls = Fork i $ map (\(Identity a) -> a) ls
 
-instance MonadFork (ExceptT e (Tree i t)) where
-  type SubEff (ExceptT e (Tree i t)) = Identity
-  type ForkInfo (ExceptT e (Tree i t)) = i
-  type ForkTag (ExceptT e (Tree i t)) = t
-  fork i ls = ExceptT $ Fork i $ map (\(Identity a) -> fmap runExceptT a) ls
+--instance MonadFork (ExceptT e (Tree i t)) where
+--  type SubEff (ExceptT e (Tree i t)) = Identity
+--  type ForkInfo (ExceptT e (Tree i t)) = i
+--  type ForkTag (ExceptT e (Tree i t)) = t
+--  fork i ls = ExceptT $ Fork i $ map (\(Identity a) -> fmap runExceptT a) ls
+
+instance (Monad (SubEff m), MonadFork m) => MonadFork (ExceptT e m) where
+  type SubEff (ExceptT e m) = SubEff m 
+  type ForkInfo (ExceptT e m) = ForkInfo m 
+  type ForkTag (ExceptT e m) = ForkTag m 
+  fork i ls = ExceptT $ fork i (map (\m -> do (t,a) <- m; return (t, runExceptT a)) ls)
 
 instance (Monad (SubEff m), MonadFork m) =>
                MonadFork (StateT s m) where

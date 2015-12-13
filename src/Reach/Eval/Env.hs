@@ -1,7 +1,7 @@
 
 module Reach.Eval.Env (
   Env(..),
-  funcs,frees,env,nextVar,funcNames,funcIds,constrNames,
+  funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames,
   showExpr)
   where
 
@@ -16,9 +16,12 @@ import qualified Data.DList as D
 
 data Env = Env {
   _funcs :: IntMap Func,
-  _frees :: IntMap (CId, D.DList FId),
+
+  _free :: IntMap (CId, [FId]),
+  _nextFVar :: FId,
+
   _env :: IntMap Expr,
-  _nextVar :: LId,
+  _nextEVar :: LId,
 
   _funcNames :: IntMap String,
   _funcIds :: Map String FuncId,

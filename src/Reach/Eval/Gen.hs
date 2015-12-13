@@ -55,9 +55,9 @@ evalGen m (Case e as) = do
   e' <- m v as
   evalGen m e'
 evalGen m (FVar x) = do
-  c <- use (frees . at x)
+  c <- use (free . at x)
   case c of
-    Just (cid, fids) -> return (Con cid (fmap FVar fids))
+    Just (cid, fids) -> return (Con cid (D.fromList $ map FVar fids))
     Nothing -> return (FVar x)
 evalGen m v = return v
 
@@ -77,8 +77,8 @@ binds _ _ _ = error "Constructor / Alterenative variable mismatch"
 -- variable x is replaced with ex in e'. Then ex is bound to e in the environment.
 bind :: Monad m => LId -> Expr -> Expr -> ReachT m Expr
 bind x e e' = do
-  ex <- use nextVar
-  nextVar += 1
+  ex <- use nextEVar
+  nextEVar += 1
   env . at ex ?= e
   return (replaceLVar x (EVar ex) e')
   

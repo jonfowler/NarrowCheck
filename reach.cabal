@@ -21,4 +21,20 @@ executable reach
   build-depends:       base ==4.*, parsec ==3.*, mtl >=2.2.1, uniplate == 1.*, containers == 0.*, lens == 4.*, dlist == 0.7.*
   hs-source-dirs:      src
   default-language:    Haskell2010
-  default-extensions: GeneralizedNewtypeDeriving, TemplateHaskell, RankNTypes, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances, TypeFamilies
+  default-extensions: GeneralizedNewtypeDeriving, 
+                      TemplateHaskell, 
+                      RankNTypes, 
+                      MultiParamTypeClasses, 
+                      FunctionalDependencies, 
+                      FlexibleInstances, 
+                      TypeFamilies
+  other-modules:  Reach.Eval.Env,
+    Reach.Eval.Expr,
+    Reach.Eval.Gen,
+    Reach.Eval.Monad,
+    Reach.Lens,
+    Reach.Parser.Conv,
+    Reach.Parser.Indent,
+    Reach.Parser.Module,
+    Reach.Parser.Parse,
+    Reach.Parser.Tokens

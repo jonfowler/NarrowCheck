@@ -65,9 +65,12 @@ setupConv as = foldM_ (\_ v -> overConv id v) 0 as
 convModule :: S.Module -> Env
 convModule m = Env {
              _funcs = I.fromList $ map (convFun c) (M.elems $ m ^. S.moduleDef),
-             _frees = I.empty,
+
+             _free = I.empty,
+             _nextFVar = 0,
+
              _env = I.empty,
-             _nextVar = 0,
+             _nextEVar = 0,
 
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
