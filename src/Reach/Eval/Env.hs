@@ -2,12 +2,13 @@
 module Reach.Eval.Env (
   Env(..),
   funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames,
-  showExpr)
+  showExpr, printFVar)
   where
 
 import Reach.Eval.Expr
 
-import Data.IntMap
+import qualified Data.IntMap as I
+import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Reach.Lens
@@ -30,13 +31,15 @@ data Env = Env {
 
 makeLenses ''Env
 
-showExpr :: Expr -> Env -> String
-showExpr (Con cid es) env = env ^. constrNames . at' cid ++ showEs (D.toList es) env
-showExpr e _ = "Can't show non constructor value: " ++ show e
+showExpr :: Env -> Expr -> String
+showExpr env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showExpr env) (D.toList es))
+showExpr _ e = "Can't show non constructor value: " ++ show e
 
-showEs :: [Expr] -> Env -> String
-showEs [] _ = ""
-showEs (e : es) env = " ( " ++ showExpr e env ++ " )" ++ showEs es env
-
+bracket :: [String] -> String
+bracket = foldr (\x s -> " (" ++ x ++ ")" ++ s) ""
 
 
+printFVar :: Env -> FId ->  String
+printFVar env x = case env ^. free . at x of
+  Just (cid, xs) -> env ^. constrNames . at' cid ++ bracket (map (printFVar env) xs)
+  Nothing -> "_"

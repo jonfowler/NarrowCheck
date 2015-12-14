@@ -1,7 +1,7 @@
 
 
-import Reach.Parser.Module
-import Reach.Parser.Conv
+import qualified Reach.Parser.Module as P
+import qualified Reach.Parser.Conv as C
 import Reach.Eval.Gen
 import Reach.Eval.Expr
 import Reach.Eval.Env
@@ -12,6 +12,7 @@ import Control.Monad.Except
 import System.Environment
 import System.Console.GetOpt
 import System.IO.Error
+
 
 data Flag 
   = DataBound Int
@@ -38,14 +39,20 @@ main = do
 go :: FilePath -> [Flag] -> IO ()
 go fn flags = do
   rf <- readFile fn
-  m <- parseModule rf
-  checkModule m
+  m <- P.parseModule rf
+  P.checkModule m
   putStrLn (show m)
-  let env = convModule m
-      fid = env ^. funcIds .at' "main"
+  let env = C.convModule m
+      fid = env ^. funcIds .at' "reach"
   putStrLn (show env)
-  (res, env') <- runReach (deepEval (Fun fid)) env
-  putStrLn (showExpr res env')
+  let rs = runF fid env
+  printResults (take 5 rs)
+
+printResults :: [(Expr, Env)] -> IO ()
+printResults = mapM_ (\(e,env) -> putStrLn (showExpr env e ++ " -> " ++ printFVar env 0))
+
+runF :: FId -> Env -> [(Expr, Env)]
+runF fid env = runReach (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)))) env
 --  case runExcept $ conv a of
 --    Left e -> print e
 --    Right fs -> do

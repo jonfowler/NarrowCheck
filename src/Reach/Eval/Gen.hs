@@ -14,59 +14,70 @@ runReach m s = do
     Left err -> fail . show $ err
     Right a -> return a
 
-type Match m = Expr -> [Alt] -> ReachT m Expr
-  
-deepEval :: Monad m => Expr -> ReachT m Expr
-deepEval = deepEvalGen matchBasic
+type Choose m = FId -> [(CId, Int)] -> ReachT m (CId, Int)
 
-deepEvalGen :: Monad m => Match m -> Expr -> ReachT m Expr
+evalLazy :: MonadChoice m => Expr -> ReachT m Expr
+evalLazy = evalGen chooseSimple
+     
+chooseSimple :: MonadChoice m => Choose m
+chooseSimple _ as = foldr (<|>) memp (map return as)
+
+deepEvalGen :: Monad m => Choose m -> Expr -> ReachT m Expr
 deepEvalGen m e = do
   Con cid es <- evalGen m e
   env <- get
   vs <- mapM (deepEvalGen m) (D.toList es)
   return (Con cid (D.fromList vs))
        
-evalGen :: Monad m => Match m -> Expr -> ReachT m Expr
-evalGen m (Let x e e')  = do
+evalGen :: Monad m => Choose m -> Expr -> ReachT m Expr
+evalGen c (Let x e e')  = do
   a <- use (env . at x)
   case a of
     Just _ -> error "variable already bound"
-    Nothing -> bind x e e' >>= evalGen m
+    Nothing -> bind x e e' >>= evalGen c
 
-evalGen m (Fun fid) = use (funcs . at' fid . body) >>= evalGen m
+evalGen c (Fun fid) = use (funcs . at' fid . body) >>= evalGen c
 
-evalGen m (EVar x) = do
+evalGen c (EVar x) = do
   a <- use (env . at x)
   case a of
      Nothing -> error "variable not bound"
      Just e -> do 
-       v <- evalGen m e 
+       v <- evalGen c e 
        env . at x ?= v
        return v
 
-evalGen m (App f e) = do
-  l <- evalGen m f
+evalGen c (App f e) = do
+  l <- evalGen c f
   case l of
-    Lam x e' -> bind x e e' >>= evalGen m
+    Lam x e' -> bind x e e' >>= evalGen c
     Con cid es -> return (Con cid (D.snoc es e))
     _ -> error "function evaluated to non lambda"
-evalGen m (Case e as) = do
-  v <- evalGen m e
-  e' <- m v as
-  evalGen m e'
-evalGen m (FVar x) = do
+
+evalGen c (Case e as) = do
+  v <- evalGen c e
+  (cid',es') <- case v of 
+    Con cid es -> return (cid, D.toList es)
+    FVar x -> do
+      (cid,vs) <- c x (map (\(Alt c vs e) -> (c,length vs)) as)
+      xs <- newFVars vs
+      free . at x ?= (cid, xs)
+      return (cid, map FVar xs)
+  e' <- match cid' es' as
+  evalGen c e'
+
+evalGen c (FVar x) = do
   c <- use (free . at x)
   case c of
     Just (cid, fids) -> return (Con cid (D.fromList $ map FVar fids))
     Nothing -> return (FVar x)
-evalGen m v = return v
+evalGen _ v = return v
 
-matchBasic :: Monad m => Match m
-matchBasic (Con cid es) (Alt cid' xs e : as)
-  | cid == cid' = binds xs (D.toList es) e
-  | otherwise   = matchBasic (Con cid es) as
-matchBasic _ [] = error "no match for constructor in case"
-matchBasic e _ = error $ "case subject did not evaluate to constructor: " ++ show e
+match :: Monad m => CId -> [Expr] -> [Alt] -> ReachT m Expr
+match  cid es (Alt cid' xs e : as)
+  | cid == cid' = binds xs es e
+  | otherwise   = match cid es as
+match _ _ [] = error "no match for constructor in case"
 
 binds :: Monad m => [LId] -> [Expr] -> Expr -> ReachT m Expr
 binds (x : xs) (e : es) e' = bind x e e' >>= binds xs es
@@ -95,3 +106,12 @@ replaceLVar lx ex (Case e as) = Case (replaceLVar lx ex e) (map replaceAlt as)
     where replaceAlt (Alt cid xs e') = Alt cid xs (replaceLVar lx ex e')
 replaceLVar lx ex (Con cid es) = Con cid (fmap (replaceLVar lx ex) es)
    
+newFVars :: Monad m => Int -> StateT Env m [FId]
+newFVars n = sequence (replicate n newFVar)
+
+newFVar :: Monad m => StateT Env m FId
+newFVar = do
+  x <- use nextFVar
+  nextFVar += 1
+  return x
+

@@ -11,34 +11,43 @@ import Reach.Lens
 import Control.Monad
 import qualified Data.DList as D
 
-matchLazy :: (MonadFork m, ForkInfo m ~ FId, ForkTag m ~ (CId, [FId]), Monad (SubEff m)) => Match m  
-matchLazy (Con _ _) [] = error "no match for constructor in case"
-matchLazy (Con cid es) (Alt cid' xs e : as)
-  | cid == cid' = binds xs (D.toList es) e
-  | otherwise   = matchBasic (Con cid es) as
-matchLazy (FVar x) as = fork x (map (branchAlt x) as)
-matchLazy e _ = error $ "case subject did not evaluate to constructor: " ++ show e
+--evalLazy :: Expr -> ReachT (Tree FId (CId, [FId])) Expr
+--evalLazy = evalGen matchLazy
 
-branchAlt :: (MonadFork m, ForkInfo m ~ FId, ForkTag m ~ (CId, [FId]), Monad (SubEff m)) =>
-             FId -> Alt -> StateT Env (SubEff m) ((CId, [FId]) , ReachT m Expr)
-branchAlt x (Alt cid vs e) = do
-  (xs, e') <- bindToFrees vs e
+type Choose m = FId -> [(CId, Int)] -> ReachT m (CId, Int)
+
+evalLazy :: MonadChoice m => Expr -> ReachT m Expr
+evalLazy = evalGen (matchLazy chooseSimple)
+     
+
+matchLazy :: Monad m => Choose m -> Match m  
+matchLazy choose (FVar x) as = do
+  (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+  xs <- newFVars vs
   free . at x ?= (cid, xs)
-  return ((cid, xs), return e')
+  matchBasic (Con cid (D.fromList $ map FVar xs)) as
+matchLazy _ e as = matchBasic e as
 
+chooseSimple :: MonadChoice m => Choose m
+chooseSimple _ as = foldr (<|>) memp (map return as)
 
-bindToFrees :: Monad m => [LId] -> Expr -> StateT Env m ([FId], Expr)
-bindToFrees [] e = return ([] , e)
-bindToFrees (v : vs) e = do
-  (x, e') <- bindToFree v e
-  (xs, e'') <- bindToFrees vs e'
-  return (x : xs, e'')
-                          
-bindToFree :: Monad m => LId -> Expr -> StateT Env m (FId, Expr)
-bindToFree v e = do
+newFVar :: Monad m => StateT Env m FId
+newFVar = do
   x <- use nextFVar
   nextFVar += 1
-  return (x , replaceLVar v (FVar x) e)
+  return x
+
+newFVars :: Monad m => Int -> StateT Env m [FId]
+newFVars n = sequence (replicate n newFVar)
+
+
+--bindToFrees :: Monad m => [LId] -> Expr -> StateT Env m ([FId], Expr)
+--bindToFrees [] e = return ([] , e)
+--bindToFrees (v : vs) e = do
+--  (x, e') <- bindToFree v e
+--  (xs, e'') <- bindToFrees vs e'
+--  return (x : xs, e'')
+                          
  
 
 
