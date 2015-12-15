@@ -63,8 +63,7 @@ evalGen c (Case e as) = do
       xs <- newFVars vs
       free . at x ?= (cid, xs)
       return (cid, map FVar xs)
-  e' <- match cid' es' as
-  evalGen c e'
+  evalGen c (match cid' es' as)
 
 evalGen c (FVar x) = do
   c <- use (free . at x)
@@ -73,9 +72,9 @@ evalGen c (FVar x) = do
     Nothing -> return (FVar x)
 evalGen _ v = return v
 
-match :: Monad m => CId -> [Expr] -> [Alt] -> ReachT m Expr
+match ::  CId -> [Expr] -> [Alt] -> Expr
 match  cid es (Alt cid' xs e : as)
-  | cid == cid' = binds xs es e
+  | cid == cid' = replaceLVars xs es e  
   | otherwise   = match cid es as
 match _ _ [] = error "no match for constructor in case"
 
@@ -92,6 +91,10 @@ bind x e e' = do
   nextEVar += 1
   env . at ex ?= e
   return (replaceLVar x (EVar ex) e')
+
+replaceLVars :: [LId] -> [Expr] -> Expr -> Expr 
+replaceLVars [] [] e = e
+replaceLVars (v : vs) (e : es) e' = replaceLVar v e (replaceLVars vs es e')
   
 replaceLVar :: LId -> Expr -> Expr -> Expr 
 replaceLVar lx ex (Let x e e') = Let x (replaceLVar lx ex e) (replaceLVar lx ex e')
@@ -105,7 +108,8 @@ replaceLVar lx ex (Lam x e) = Lam x (replaceLVar lx ex e)
 replaceLVar lx ex (Case e as) = Case (replaceLVar lx ex e) (map replaceAlt as)
     where replaceAlt (Alt cid xs e') = Alt cid xs (replaceLVar lx ex e')
 replaceLVar lx ex (Con cid es) = Con cid (fmap (replaceLVar lx ex) es)
-   
+replaceLVar lx e (FVar x) = FVar x 
+
 newFVars :: Monad m => Int -> StateT Env m [FId]
 newFVars n = sequence (replicate n newFVar)
 

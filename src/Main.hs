@@ -1,5 +1,4 @@
 
-
 import qualified Reach.Parser.Module as P
 import qualified Reach.Parser.Conv as C
 import Reach.Eval.Gen
@@ -53,15 +52,3 @@ printResults = mapM_ (\(e,env) -> putStrLn (showExpr env e ++ " -> " ++ printFVa
 
 runF :: FId -> Env -> [(Expr, Env)]
 runF fid env = runReach (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)))) env
---  case runExcept $ conv a of
---    Left e -> print e
---    Right fs -> do
---      let (e, xs, s) = toProg fs dd 10
---      let res =  map (\s -> map (getExp s) xs)  $ reachF e s 
---      mapM_ (putStrLn . unwords . map printVal) res
---  where
---    (dd:_) = [d | DataBound d <- flags] ++ [100000000]
-
---printWithErr :: (Show err) => Either err Exp -> String
---printWithErr (Left err) = show err
---printWithErr (Right e) =  printVal e

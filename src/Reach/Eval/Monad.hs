@@ -4,8 +4,6 @@ module Reach.Eval.Monad (
   ReachT,
   ReachFail(..),
   MonadChoice(..)
---  MonadFork(..),
---  Tree(..)
   ) where
 
 import Control.Monad.State as X
