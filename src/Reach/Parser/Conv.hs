@@ -33,12 +33,6 @@ data Convert = Convert {
 
 makeLenses ''Convert
 
---newtype MaxInt = MaxInt Int deriving (Num)
---
---instance Monoid MaxInt where
---  mempty = 0
---  mappend (MaxInt m) (MaxInt n) = MaxInt (max m n)
-
 type ConvertM = StateT Convert (Except String)  --ConvertM {runConvert :: (Convert -> (a , Int))}
 
 viewConv :: Ord a => Getter Convert (Conv a) -> a -> ConvertM Int
@@ -100,12 +94,22 @@ convExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
 convExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")
-convExpr (S.App e e') = App <$> (convExpr e) <*> (convExpr e') 
+convExpr (S.App e e') = do
+  ne <- convExpr e
+  case ne of
+    Con cid es -> do
+      ne' <- convExpr e'
+      return $ Con cid (D.snoc es ne')
+    ne' -> App ne <$> convExpr e' 
+  
 convExpr (S.Parens e) = convExpr e
 convExpr (S.Case e as) = do
   e' <- convExpr e
   as' <- mapM convAlt as
   return (Case e' as')
+
+--atomiseExpr :: Expr -> Expr
+--atomiseExpr (Con cid 
 
 
 convAlt :: S.Alt -> ConvertM Alt
