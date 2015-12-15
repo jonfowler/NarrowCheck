@@ -13,8 +13,6 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Reach.Lens
 
-import qualified Data.DList as D
-
 data Env = Env {
   _funcs :: IntMap Func,
 
@@ -32,7 +30,7 @@ data Env = Env {
 makeLenses ''Env
 
 showExpr :: Env -> Expr -> String
-showExpr env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showExpr env) (D.toList es))
+showExpr env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showExpr env) es)
 showExpr _ e = "Can't show non constructor value: " ++ show e
 
 bracket :: [String] -> String

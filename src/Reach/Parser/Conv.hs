@@ -6,10 +6,9 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
 
-import Control.Lens
+import Reach.Lens
 import Control.Monad.State
 import Control.Monad.Except
-import qualified Data.DList as D
 
 import Control.Applicative
 
@@ -28,7 +27,8 @@ makeLenses ''Conv
 data Convert = Convert {
   _convertFuncId :: Conv S.VarId,
   _convertCon :: Conv S.ConId,
-  _convertLocals :: Conv S.VarId
+  _convertLocals :: Conv S.VarId,
+  _conInfo :: Map S.ConId Int 
                        }
 
 makeLenses ''Convert
@@ -50,7 +50,8 @@ setupConvert :: S.Module -> Convert
 setupConvert m = Convert
   { _convertFuncId = execState (setupConv (M.keys $ m ^. S.moduleDef)) emptyConv,
     _convertCon = execState (setupConv (M.keys $ m ^. S.moduleCon)) emptyConv,
-    _convertLocals = emptyConv
+    _convertLocals = emptyConv,
+    _conInfo = fmap (length . S._conArgs) $ m ^. S.moduleCon 
   }
 
 setupConv :: Ord a => [a] -> State (Conv a) ()
@@ -88,29 +89,71 @@ convArgs (v : vs) = do
   f <- convArgs vs
   return (Lam i . f)
 
-convExpr :: S.Exp -> ConvertM Expr
-convExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
+convSubExpr :: S.Exp -> ConvertM Expr
+convSubExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
                     <|> Fun <$> viewConv convertFuncId vid
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
-convExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
+convSubExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")
-convExpr (S.App e e') = do
+convSubExpr (S.App e e') = do
   ne <- convExpr e
   case ne of
     Con cid es -> do
       ne' <- convExpr e'
-      return $ Con cid (D.snoc es ne')
+      return $ Con cid (es ++ [ne'])
     ne' -> App ne <$> convExpr e' 
   
-convExpr (S.Parens e) = convExpr e
-convExpr (S.Case e as) = do
+convSubExpr (S.Parens e) = convSubExpr e
+convSubExpr (S.Case e as) = do
   e' <- convExpr e
   as' <- mapM convAlt as
   return (Case e' as')
 
---atomiseExpr :: Expr -> Expr
---atomiseExpr (Con cid 
+convExpr :: S.Exp -> ConvertM Expr
+convExpr e = do
+  e' <- convSubExpr e 
+  case e' of
+    (Con cid es) -> atomiseCon cid es 
+    _ -> return e'
 
+atomiseCon :: CId -> [Expr] -> ConvertM Expr
+atomiseCon cid es = do
+  n <- argNum cid
+  (f , es') <- addLams (n - length es)
+  (g , e'') <- atomiser (Con cid (es ++ es'))
+  return (f . g $ e'')
+
+addLams :: Int -> ConvertM (Expr -> Expr, [Expr])
+addLams 0 = return (id , [])
+addLams n = do
+  v <- overConv convertLocals  ""
+  (f , es) <- addLams (n - 1)
+  return (Lam v , LVar v : es )
+
+
+argNum :: CId -> ConvertM Int
+argNum cid = do
+  c <- use (convertCon . mapFromInt . at' cid)
+  use (conInfo . at' c)
+
+  
+
+atomiser :: Expr -> ConvertM (Expr -> Expr, Expr)
+atomiser (Con cid es) = do
+  (f , es') <- atomising es
+  return (f , Con cid es')
+atomiser (Lam v e) = return (id , Lam v e)
+atomiser (LVar x) = return (id , LVar x)
+atomiser e = do
+  x <- overConv convertLocals  ""
+  return (Let x e , LVar x)
+
+atomising :: [Expr] -> ConvertM (Expr -> Expr, [Expr])
+atomising [] = return (id, [])
+atomising (e : es) = do
+  (f,e') <- atomiser e
+  (g,es') <- atomising es
+  return (f . g, e : es')
 
 convAlt :: S.Alt -> ConvertM Alt
 convAlt (S.Alt (S.Con cid xs)  e) = do

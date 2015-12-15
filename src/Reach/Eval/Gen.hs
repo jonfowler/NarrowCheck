@@ -5,8 +5,6 @@ import Reach.Eval.Env
 import Reach.Eval.Expr
 import Reach.Eval.Monad
 
-import qualified Data.DList as D 
-
 runReach :: Monad m => ReachT m a -> Env -> m (a , Env)
 runReach m s = do
   r <- runExceptT (runStateT m s)
@@ -26,8 +24,8 @@ deepEvalGen :: Monad m => Choose m -> Expr -> ReachT m Expr
 deepEvalGen m e = do
   Con cid es <- evalGen m e
   env <- get
-  vs <- mapM (deepEvalGen m) (D.toList es)
-  return (Con cid (D.fromList vs))
+  vs <- mapM (deepEvalGen m) es
+  return (Con cid vs)
        
 evalGen :: Monad m => Choose m -> Expr -> ReachT m Expr
 evalGen c (Let x e e')  = do
@@ -51,13 +49,12 @@ evalGen c (App f e) = do
   l <- evalGen c f
   case l of
     Lam x e' -> bind x e e' >>= evalGen c
-    Con cid es -> return (Con cid (D.snoc es e))
     _ -> error "function evaluated to non lambda"
 
 evalGen c (Case e as) = do
   v <- evalGen c e
   (cid',es') <- case v of 
-    Con cid es -> return (cid, D.toList es)
+    Con cid es -> return (cid, es)
     FVar x -> do
       (cid,vs) <- c x (map (\(Alt c vs e) -> (c,length vs)) as)
       xs <- newFVars vs
@@ -68,7 +65,7 @@ evalGen c (Case e as) = do
 evalGen c (FVar x) = do
   c <- use (free . at x)
   case c of
-    Just (cid, fids) -> return (Con cid (D.fromList $ map FVar fids))
+    Just (cid, fids) -> return (Con cid (map FVar fids))
     Nothing -> return (FVar x)
 evalGen _ v = return v
 

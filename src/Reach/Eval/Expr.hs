@@ -3,7 +3,6 @@ module Reach.Eval.Expr where
 --import Reach.Lens
 
 import Control.Lens
-import Data.DList
 
 import Control.Monad
 
@@ -34,7 +33,7 @@ data Expr
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression
   -- is only evaluated once.
-  | Con !CId (DList Atom) deriving Show
+  | Con !CId [Atom] deriving Show
 
 data Alt = Alt !CId [LId] Expr deriving Show
 
