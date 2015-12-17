@@ -5,6 +5,7 @@ import Reach.Eval.Env
 import Reach.Eval.Expr
 import Reach.Eval.Monad
 
+{-
 runReach :: Monad m => ReachT m a -> Env -> m (a , Env)
 runReach m s = do
   r <- runExceptT (runStateT m s)
@@ -116,3 +117,4 @@ newFVar = do
   nextFVar += 1
   return x
 
+-}

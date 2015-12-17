@@ -155,7 +155,7 @@ atomising (e : es) = do
   (g,es') <- atomising es
   return (f . g, e : es')
 
-convAlt :: S.Alt -> ConvertM Alt
+convAlt :: S.Alt -> ConvertM (Alt Expr)
 convAlt (S.Alt (S.Con cid xs)  e) = do
   cs <- viewCons cid
   vs <- mapM (overConv convertLocals) xs

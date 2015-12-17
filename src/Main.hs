@@ -1,7 +1,7 @@
 
 import qualified Reach.Parser.Module as P
 import qualified Reach.Parser.Conv as C
-import Reach.Eval.Gen
+import Reach.Eval.Cont
 import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
@@ -40,15 +40,13 @@ go fn flags = do
   rf <- readFile fn
   m <- P.parseModule rf
   P.checkModule m
-  putStrLn (show m)
   let env = C.convModule m
       fid = env ^. funcIds .at' "reach"
-  putStrLn (show env)
   let rs = runF fid env
-  printResults (take 5 rs)
+  printResults (take 50 rs)
 
 printResults :: [(Expr, Env)] -> IO ()
 printResults = mapM_ (\(e,env) -> putStrLn (showExpr env e ++ " -> " ++ printFVar env 0))
 
 runF :: FId -> Env -> [(Expr, Env)]
-runF fid env = runReach (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)))) env
+runF fid env = runReach (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)) Fin)) env

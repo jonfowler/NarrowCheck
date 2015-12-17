@@ -27,6 +27,7 @@ executable reach
                       MultiParamTypeClasses, 
                       FunctionalDependencies, 
                       FlexibleInstances, 
+                      DeriveFunctor,
                       TypeFamilies
   other-modules:  Reach.Eval.Env,
     Reach.Eval.Expr,

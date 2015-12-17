@@ -19,7 +19,7 @@ data Env = Env {
   _free :: IntMap (CId, [FId]),
   _nextFVar :: FId,
 
-  _env :: IntMap Expr,
+  _env :: IntMap Cont,
   _nextEVar :: LId,
 
   _funcNames :: IntMap String,
