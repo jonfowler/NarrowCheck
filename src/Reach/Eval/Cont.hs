@@ -69,6 +69,7 @@ reduce (FVar x) conts = trace "fvar" $ do
 
 reduce (LVar x) conts = return (Cont (LVar x) conts)
 
+reduce e cs = error ("Unexpected case in reduce: \n"++show e ++"\n" ++ show cs)
 
 
 match ::  CId -> [Expr] -> [Alt Cont] -> Cont
