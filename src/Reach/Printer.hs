@@ -1,4 +1,7 @@
-module Reach.Printer where
+module Reach.Printer
+  (printExpr,
+   putDoc
+   )where
 
 import Prelude hiding ((<$>))
 import Text.PrettyPrint.Leijen
@@ -8,7 +11,7 @@ import Reach.Eval.Expr
 import Reach.Eval.Env
 
 printExpr :: Env -> Expr -> Doc
-printExpr s = bracketer s . appList 
+printExpr s = bracketer s . reverse . appList 
 
 bracketer :: Env -> [Expr] -> Doc
 bracketer s [e] = fst $ printExpr' s e
@@ -34,14 +37,21 @@ printExpr' s (EVar x) = (var "e" x , False)
 printExpr' s (LVar x) = (var "v" x , False)
 printExpr' s (FVar x) = (var "x" x , False)
 printExpr' s e@(App _ _) = (printExpr s e, True)
-printExpr' s (Lam x e) = (text "\955 ->" <+> printExpr s e , True)
+printExpr' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
 printExpr' s (Case e as) = (text "case" <+>
-                            printExpr s e <+>
-                            text "of" <$>
-                            nest 2 (vsep . map (printAlt s (printExpr s)) $ as), True)
-jjjiii
+                            printExpr s e <+> 
+                            nest 2 (text "of" <$>
+                      (vsep . map (printAlt s (printExpr s))) as)
+                           , True)
+printExpr' s (Con cid es) = (text (s ^. constrNames . at' cid)
+                            <+> (group . hsep . map (bracketExpr s) $ es)
+                            , True)
+  
 printAlt :: Env -> (a -> Doc) -> Alt a -> Doc
-printAlt s p (Alt cid vs e) = text ()hh
+printAlt s p (Alt cid vs e) = text (s ^. constrNames . at' cid)
+  <+> hsep (map (var "v") vs)
+  <+> text "->"
+  <+> p e
 {- 
 data Expr
   = Let !LId Expr Expr
@@ -56,6 +66,6 @@ data Expr
 -}
 
 appList :: Expr -> [Expr]
-appList (App e e') = e : appList e' 
+appList (App e e') = e' : appList e 
 appList e = [e]
 

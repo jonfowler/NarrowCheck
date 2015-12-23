@@ -5,6 +5,7 @@ import Reach.Eval.Cont
 import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
+import Reach.Printer
       
 import Control.Monad.Except
 
@@ -42,8 +43,10 @@ go fn flags = do
   P.checkModule m
   let env = C.convModule m
       fid = env ^. funcIds .at' "reach"
+      Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "all")
   let rs = runF fid env
-  printResults (take 50 rs)
+  putDoc (printExpr env allfunc)
+--  printResults (take 50 rs)
 
 printResults :: [(Expr, Env)] -> IO ()
 printResults = mapM_ (\(e,env) -> putStrLn (showExpr env e ++ " -> ")) -- ++ printFVar env 0))
