@@ -81,7 +81,7 @@ convFun c def = case runExcept . runStateT s $ c of
   Right (e , c') -> (
     fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at (def ^. S.defName)) ,
     Func {_body = e, _vars = (c' ^. convertLocals . nextInt)})
- where s = convArgs (def ^. S.defArgs) <*> convExpr (def ^. S.defBody) []
+ where s = convArgs (def ^. S.defArgs) <*> convExpr (partial $ def ^. S.defBody) []
 
 convArgs :: [S.VarId] -> ConvertM (Expr -> Expr)
 convArgs [] = return id
