@@ -1,8 +1,7 @@
-
 module Reach.Eval.Env (
   Env(..),
   funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames,
-  showExpr, printFVar)
+  showAtom, printFVar)
   where
 
 import Reach.Eval.Expr
@@ -19,7 +18,7 @@ data Env = Env {
   _free :: IntMap (CId, [FId]),
   _nextFVar :: FId,
 
-  _env :: IntMap Cont,
+  _env :: IntMap Expr,
   _nextEVar :: LId,
 
   _funcNames :: IntMap String,
@@ -29,9 +28,9 @@ data Env = Env {
 
 makeLenses ''Env
 
-showExpr :: Env -> Expr -> String
-showExpr env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showExpr env) es)
-showExpr _ e = "Can't show non constructor value: " ++ show e
+showAtom :: Env -> Atom -> String
+showAtom env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showAtom env) es)
+showAtom _ e = "Can't show non constructor value: " ++ show e
 
 bracket :: [String] -> String
 bracket = foldr (\x s -> " (" ++ x ++ ")" ++ s) ""

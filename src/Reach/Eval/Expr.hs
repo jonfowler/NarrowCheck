@@ -16,7 +16,7 @@ type FId = Int
 
 data Alt a = Alt !CId [LId] a deriving (Show, Functor)
 
-data Conts = Branch [Alt Cont]
+data Conts = Branch [Alt Expr]
            | Apply Expr deriving (Show)
 
 data Expr = Expr Atom [Conts]
@@ -46,8 +46,10 @@ data Atom
   | Con !CId [Atom] deriving Show
 
 
-toCont :: Expr -> Cont
-toCont e = Cont e [] 
+atom :: Atom -> Expr
+atom a = Expr a []
+--toCont :: Expr -> Cont
+--toCont e = Cont e [] 
 
 --toExpr :: Cont -> Expr
 --toExpr (Cont e []) = e
@@ -56,7 +58,6 @@ toCont e = Cont e []
 
 
 -- Atoms are nested constructors with variables at their leaves.
-type Atom = Expr
 
 data Func =
   Func {_body :: Expr,
