@@ -16,26 +16,15 @@ type FId = Int
 
 data Alt a = Alt !CId [LId] a deriving (Show, Functor)
 
-data Conts = [Alt Cont] :<: Conts
-           | Expr :$: Conts 
-           | Fin deriving Show
+data Conts = Branch [Alt Cont]
+           | Apply Expr deriving (Show)
 
-contsMap :: (Cont -> Cont) -> (Expr -> Expr) -> Conts -> Conts
-contsMap f g Fin = Fin
-contsMap f g (as :<: cs) = fmap (fmap f) as :<: contsMap f g cs
-contsMap f g (e :$: cs) = g e :$: contsMap f g cs
+data Expr = Expr Atom [Conts]
+  | Let !LId Expr Expr
+          deriving Show
 
-(+++) :: Conts -> Conts -> Conts
-Fin +++ c = c
-as :<: cs +++ c = as :<: cs +++ c
-e :$: cs +++ c = e :$: cs +++ c
-
-
-data Cont = Cont !Expr !Conts deriving Show
-
-data Expr
-  = Let !LId Expr Expr
-  | Fun {-# UNPACK #-} !FuncId
+data Atom 
+  = Fun {-# UNPACK #-} !FuncId
 
   -- Environment variables are the variables used to implement
   -- call by need evaluation.
@@ -47,9 +36,9 @@ data Expr
 
   -- FVar's are the free variables
   | FVar !FId
-  | App Expr Expr 
+--  | App Expr Expr 
   | Lam !LId Expr
-  | Case Expr [Alt Expr] 
+--  | Case Expr [Alt Expr] 
 
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression
@@ -58,7 +47,12 @@ data Expr
 
 
 toCont :: Expr -> Cont
-toCont e = Cont e Fin
+toCont e = Cont e [] 
+
+--toExpr :: Cont -> Expr
+--toExpr (Cont e []) = e
+--toExpr (Cont e (Apply e' : cs)) = toExpr (Cont (App e e') cs)
+--toExpr (Cont e (Branch as : cs)) = toExpr (Cont (Case e (fmap (fmap toExpr) as)) cs)
 
 
 -- Atoms are nested constructors with variables at their leaves.

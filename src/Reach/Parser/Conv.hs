@@ -12,6 +12,7 @@ import Control.Monad.Except
 
 import Control.Applicative
 
+import Reach.Parser.ConReduce
 import qualified Reach.Parser.Module as S
 import Reach.Eval.Expr
 import Reach.Eval.Env
@@ -89,19 +90,19 @@ convArgs (v : vs) = do
   f <- convArgs vs
   return (Lam i . f)
 
-convSubExpr :: S.Exp -> ConvertM Expr
+convSubExpr :: S.Exp -> ConvertM Cont
 convSubExpr (S.Var vid) =  LVar <$> viewConv convertLocals vid
                     <|> Fun <$> viewConv convertFuncId vid
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
-convSubExpr (S.ConE cid) = flip Con empty <$> viewConv convertCon cid
+convSubExpr (S.ConE cid) = flip Con [] <$> viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")
 convSubExpr (S.App e e') = do
-  ne <- convExpr e
+  ne <- convSubExpr e
   case ne of
     Con cid es -> do
       ne' <- convExpr e'
       return $ Con cid (es ++ [ne'])
-    ne' -> App ne <$> convExpr e' 
+    _ -> App ne <$> convExpr e' 
   
 convSubExpr (S.Parens e) = convSubExpr e
 convSubExpr (S.Case e as) = do
@@ -109,7 +110,7 @@ convSubExpr (S.Case e as) = do
   as' <- mapM convAlt as
   return (Case e' as')
 
-convExpr :: S.Exp -> ConvertM Expr
+convExpr :: S.Exp -> ConvertM Cont
 convExpr e = do
   e' <- convSubExpr e 
   case e' of
@@ -128,7 +129,7 @@ addLams 0 = return (id , [])
 addLams n = do
   v <- overConv convertLocals  ""
   (f , es) <- addLams (n - 1)
-  return (Lam v , LVar v : es )
+  return (Lam v . f , LVar v : es )
 
 
 argNum :: CId -> ConvertM Int
@@ -144,6 +145,7 @@ atomiser (Con cid es) = do
   return (f , Con cid es')
 atomiser (Lam v e) = return (id , Lam v e)
 atomiser (LVar x) = return (id , LVar x)
+atomiser (Fun fid) = return (id , Fun fid)
 atomiser e = do
   x <- overConv convertLocals  ""
   return (Let x e , LVar x)

@@ -14,6 +14,8 @@ and x y = case x of
   True -> y
   False -> False
 
+test = Node Leaf 
+
 imp x y = case x of
   True -> y
   False -> True

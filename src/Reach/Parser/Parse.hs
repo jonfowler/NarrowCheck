@@ -6,16 +6,17 @@ import Control.Lens
 data Con a = Con {_conName :: ConId, _conArgs :: [a]} deriving (Show)
 makeLenses ''Con
 
-data Exp = Case Exp [Alt]
-         | App Exp Exp
-         | Parens Exp
-         | ConE ConId
-         | Var VarId deriving (Show)
+data Expr = Case Expr [Alt]
+          | App Expr Expr
+          | Parens Expr
+          | ConE ConId [Expr]
+          | ConHole
+          | Var VarId deriving (Show)
 
-data Alt = Alt {_altPattern :: Con VarId, _altBody :: Exp} deriving (Show)
+data Alt = Alt {_altPattern :: Con VarId, _altBody :: Expr} deriving (Show)
 makeLenses ''Alt
 
-data Def = Def {_defName :: VarId, _defArgs :: [VarId], _defBody :: Exp} deriving (Show)
+data Def = Def {_defName :: VarId, _defArgs :: [VarId], _defBody :: Expr} deriving (Show)
 makeLenses ''Def
 
 data Type = Type :-> Type
@@ -45,7 +46,7 @@ parseInnerType :: Parser Type
 parseInnerType = strictIndent >> (between (res "(") (res ")") parseType
                <|> Type <$> parseTypeId)
 
-parseExp :: Parser Exp
+parseExp :: Parser Expr
 parseExp = (parseCase <|> parseApp)
 
 parseDef = try (Def <$>
@@ -53,12 +54,12 @@ parseDef = try (Def <$>
     (many (strictIndent >> parseVarId) <* res "=")) <*>
     parseExp
 
-parseInnerExp :: Parser Exp
+parseInnerExp :: Parser Expr
 parseInnerExp = strictIndent >> (  try (Var <$> parseVarId)
-                               <|> try (ConE <$> parseConId)
+                               <|> try (ConE <$> parseConId <*> pure [])
                                <|> parseParens )
 
-parseParens :: Parser Exp
+parseParens :: Parser Expr
 parseParens = Parens <$> between (res "(") (res ")") parseExp
 
 parseAlt :: Parser Alt
@@ -66,14 +67,14 @@ parseAlt = Alt <$> try (parseCon parseVarId)
                <*> (res "->" *> parseExp)
 
 
-parseCase :: Parser Exp
+parseCase :: Parser Expr
 parseCase = Case <$> (try (res "case") *> parseExp)
                  <*> (res "of" *> block parseAlt)
 
-parseApp :: Parser Exp  
+parseApp :: Parser Expr
 parseApp = toApp <$> many1 parseInnerExp  --parseInnerExp
 
-toApp :: [Exp] -> Exp
+toApp :: [Expr] -> Expr
 toApp = go . reverse
   where go [e] = e
         go (e : es) = App (go es) e

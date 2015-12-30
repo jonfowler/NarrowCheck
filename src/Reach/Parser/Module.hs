@@ -148,13 +148,13 @@ checkScopeDef :: Module -> Def -> Except String ()
 checkScopeDef m d = mapM_ (checkLocal m M.empty) (d ^. defArgs) >>
                     checkScopeExp m M.empty (d ^. defBody)
 
-checkScopeExp :: Module -> Map VarId () -> Exp -> Except String ()
+checkScopeExp :: Module -> Map VarId () -> Expr -> Except String ()
 checkScopeExp m locals (Case e as) = checkScopeExp m locals e <|>
    asum (checkScopeAlt m locals <$> as)
 checkScopeExp m locals (App e e') = checkScopeExp m locals e <|> checkScopeExp m locals e'
 checkScopeExp m locals (Parens e) = checkScopeExp m locals e
 checkScopeExp m locals (Var vid) = checkScope m locals vid
-checkScopeExp m locals (ConE cid) = return ()
+checkScopeExp m locals (ConE cid es) = mapM_ (checkScopeExp m locals) es 
 
 checkScopeAlt :: Module -> Map VarId () -> Alt -> Except String ()
 checkScopeAlt m locals a = do

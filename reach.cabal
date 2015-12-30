@@ -38,8 +38,10 @@ executable reach
                       TypeFamilies
   other-modules:  Reach.Eval.Env,
     Reach.Eval.Expr,
+    Reach.Eval.Cont,
     Reach.Eval.Gen,
     Reach.Eval.Monad,
+    Reach.Printer,
     Reach.Lens,
     Reach.Parser.Conv,
     Reach.Parser.Indent,
