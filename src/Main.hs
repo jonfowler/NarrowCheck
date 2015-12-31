@@ -45,13 +45,13 @@ go fn flags = do
       fid = env ^. funcIds .at' "reach"
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
   let rs = runF fid env
-  printResults (take 50 rs)
+  printResults (take 10 rs)
 
 printResults :: [(Atom, Env)] -> IO ()
-printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> ")) -- ++ printFVar env 0))
+printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> " ++ printFVar env 0))
 
 runF :: FId -> Env -> [(Atom, Env)]
-runF fid env = runReach (evalLazy (Fun fid) []) env
+runF fid env = runReach (newFVar >>= \x -> evalLazy (Fun fid) [Apply . atom . FVar $ x]) env
 
 
 --runF :: FId -> Env -> [(Expr, Env)]

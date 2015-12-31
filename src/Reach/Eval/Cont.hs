@@ -19,7 +19,7 @@ type Reduce m = Atom -> [Conts] -> ReachT m (Atom, [Conts])
 
 evalLazy :: MonadChoice m => Atom -> [Conts] -> ReachT m Atom
 evalLazy e conts = do
-   c <- fix reduceTrace e conts
+   c <- fix reduce e conts
    case c of 
      (e, []) -> return e
      (FVar x, Branch as : cs) -> do
@@ -52,6 +52,7 @@ reduce r (Lam x e') (Apply e : cs) = do
 reduce r (Con cid es) (Branch as : cs) = do
   (e, cs') <- bindLets $ match cid es as
   r e (cs' ++ cs)
+reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemented yet"
 reduce r (Fun fid) cs = do
   Expr e cs' <- use (funcs . at' fid . body) 
   r e (cs' ++ cs) 

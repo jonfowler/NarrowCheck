@@ -4,7 +4,7 @@ data Bool = True | False
 data Nat = Z | S Nat
 data Tree = Leaf | Node Tree Nat Tree
 
-reach = all (Node Leaf s2 Leaf) (le s1) 
+reach x = all x (le s1) 
 
 all t p = case t of
   Leaf -> True
@@ -13,8 +13,6 @@ all t p = case t of
 and x y = case x of
   True -> y
   False -> False
-
-test = Node Leaf 
 
 imp x y = case x of
   True -> y
