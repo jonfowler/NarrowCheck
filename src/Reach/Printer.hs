@@ -41,6 +41,7 @@ printAtom' s (Con cid []) = (text (s ^. constrNames . at' cid)
 printAtom' s (Con cid es) = (text (s ^. constrNames . at' cid)
                             <+> (group . hsep . map (bracket . printAtom' s) $ es)
                             , True)
+printAtom' s (Fun fid) = (text (s ^. funcNames . at' fid), False)
  
 printExpr :: Env -> Expr -> Doc
 printExpr s =  fst . printExpr' s 

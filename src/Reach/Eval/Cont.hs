@@ -15,73 +15,56 @@ runReach m s = do
     Left err -> fail . show $ err
     Right a -> return a
 
-type Reduce m = Atom -> [Expr] -> ReachT m Expr
+type Reduce m = Atom -> [Conts] -> ReachT m (Atom, [Conts])
 
---evalLazy :: MonadChoice m => Expr -> [Conts] -> ReachT m Expr
---evalLazy e conts = do
---   c <- fix reduceTrace e conts
---   case c of 
---     Cont e [] -> return e
---     Cont (FVar x) (Branch as : cs) -> do
---       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
---       xs <- newFVars vs
---       free . at x ?= (cid, xs)
---       evalLazy (Con cid (map FVar xs)) (Branch as : cs)
+evalLazy :: MonadChoice m => Atom -> [Conts] -> ReachT m Atom
+evalLazy e conts = do
+   c <- fix reduceTrace e conts
+   case c of 
+     (e, []) -> return e
+     (FVar x, Branch as : cs) -> do
+       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+       xs <- newFVars vs
+       free . at x ?= (cid, xs)
+       evalLazy (Con cid (map FVar xs)) (Branch as : cs)
 
 choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
 choose _ = foldr ((<|>) . return) memp 
 
            
---reduceTrace :: Monad m => Reduce m -> Reduce m
---reduceTrace r e cs = do
---  s <- get
---  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
+reduceTrace :: Monad m => Reduce m -> Reduce m
+reduceTrace r e cs = do
+  s <- get
+  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
-reduceExpr :: Monad m => (Expr -> ReachT m (Atom, [Conts])) -> Expr -> ReachT m (Atom, [Conts])
-reduceExpr r (Let x e e') = do
+bindLets :: Monad m => Expr -> ReachT m (Atom, [Conts]) 
+bindLets (Let x e e') = do
   e'' <- bind x e e'  
-  r e''
-reduceExpr r (Expr a cs) = reduce r a cs
+  bindLets e''
+bindLets (Expr a cs) = return (a, cs)
   
-reduce :: Monad m => (Expr -> ReachT m (Atom, [Conts])) -> Atom -> [Conts] -> ReachT m (Atom, [Conts])
-reduce r  (Lam x e) [] = return (Lam x e, [])
---reduce r (Lam x e) [] = return $ Cont (Lam x e) []
---reduce r (Con cid es) [] = return $ Cont (Con cid es) []
---                          
---reduce r (Lam x e') (Apply e : conts) = do
---  e'' <- bind x e e'
---  r e'' conts
---
---reduce r (Con cid es) (Branch as : conts) = 
---  let Cont e cs = match cid es as
---  in r e (cs ++ conts)
---
---reduce r (Case e as) conts = 
---  r e (Branch (fmap (fmap toCont) as) : conts)
---
---reduce r (Let x e e') conts 
---reduce r (Fun fid) conts = do
---  e <- use (funcs . at' fid . body) 
---  r e conts
---
---reduce r (EVar x) conts = do
---  Cont e cs <-  use (env . at' x)
---  Cont e' cs' <- r e cs 
---  env . at x ?= Cont e' cs' 
---  r e' (cs' ++ conts)
---
---reduce r (App f e) conts = r f (Apply e : conts)
---
---reduce r (FVar x) conts = do
---  c <- use (free . at x)
---  case c of
---    Just (cid, fids) -> r (Con cid (map FVar fids)) conts
---    Nothing -> return (Cont (FVar x) conts)
---
---reduce r (LVar x) conts = return (Cont (LVar x) conts)
---
---reduce r e cs = error ("Unexpected case in reduce: \n"++show e ++"\n" ++ show cs)
-
+reduce :: Monad m => Reduce m -> Reduce m
+reduce r (Lam x e)    [] = return (Lam x e, [])
+reduce r (Con cid es) [] = return (Con cid es, [])
+reduce r (Lam x e') (Apply e : cs) = do
+  (e'', cs') <- bind x e e' >>= bindLets 
+  r e'' (cs' ++ cs)
+reduce r (Con cid es) (Branch as : cs) = do
+  (e, cs') <- bindLets $ match cid es as
+  r e (cs' ++ cs)
+reduce r (Fun fid) cs = do
+  Expr e cs' <- use (funcs . at' fid . body) 
+  r e (cs' ++ cs) 
+reduce r (EVar x) cs = do
+  (e , cs') <- use (env . at' x) >>= bindLets
+  (e' , cs'') <- r e cs'
+  env . at x ?= Expr e' cs''
+  r e' (cs'' ++ cs)
+reduce r (FVar x) cs = do
+  c <- use (free . at x)
+  case c of
+    Just (cid, fids) -> r (Con cid (map FVar fids)) cs
+    Nothing -> return (FVar x, cs)
 
 match ::  CId -> [Atom] -> [Alt Expr] -> Expr
 match  cid es (Alt cid' xs c : as)
@@ -131,6 +114,7 @@ replaceAtom v a (Lam x e)
   | v == x    = Lam x e
   | otherwise = Lam x (replaceLVar v a e)
 replaceAtom v a (FVar x) = FVar x
+replaceAtom v a (Con c as) = Con c (map (replaceAtom v a) as)
 --                               Cont (replaceLVarExpr v e e')
 --                                    (map replaceConts as)
 --  where replaceConts (Branch as) = Branch $ (fmap . fmap) (replaceLVar v e) as
