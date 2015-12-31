@@ -15,7 +15,9 @@ runReach m s = do
     Left err -> fail . show $ err
     Right a -> return a
 
-type Reduce m = Atom -> [Conts] -> ReachT m (Atom, [Conts])
+type Reduce m = Atom -> [Conts] -> ReachT m Expr' 
+type Expr' = (Atom, [Conts])
+type Susp = (FId, [Conts])
 
 evalLazy :: MonadChoice m => Atom -> [Conts] -> ReachT m Atom
 evalLazy e conts = do
@@ -31,6 +33,45 @@ evalLazy e conts = do
 choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
 choose _ = foldr ((<|>) . return) memp 
 
+
+evalInter :: Monad m => Expr' -> ReachT m (Either Expr' (Atom, [Susp]) )
+evalInter (e, cs) = do
+  c <- fix reduce e cs
+  case c of
+    (LVar v, cs') -> return (Left (LVar v, cs'))
+    (FVar x, cs') -> do
+      i <- interweaver cs'
+      return $ case i of
+        Left cs'' -> Left (FVar x, cs'')
+        Right (e', cs'', es) -> Right (e', (x, cs'') : es)
+    (Con c es, []) -> return $ Right (Con c es, [])
+    (Lam x e, []) -> return $ Right (Lam x e, [])
+
+
+addCont :: Conts -> Either [Conts] (Atom, [Conts], [Susp]) ->
+                     Either [Conts] (Atom, [Conts], [Susp]) 
+addCont c (Left cs) = Left (c : cs)
+addCont c (Right (e, cs', es)) = Right (e, c : cs', es)
+
+interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] (Atom , [Conts] , [Susp]))
+interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
+interweaver (Branch as : cs) = do
+  i <- interweave as  
+  case i of 
+    Left as' -> addCont (Branch as') <$> interweaver cs
+    Right (e, es) -> return (Right (e, [], es))
+
+interweave :: [Alt Expr] -> ReachT m (Either [Alt Expr] (Atom , [Susp]))
+interweave = undefined
+
+consolidate :: [Alt (Atom, [Susp])] -> Maybe (CId, [Alt [Atom]], [Susp])
+consolidate [Alt c vs (Con cid es, s)] = Just (cid, [Alt c vs es], s) 
+consolidate (Alt c vs (Con cid es, s) : as) = do
+   (cid', ars, s') <- consolidate as
+   if cid' == cid
+     then return (cid', Alt c vs es : ars, s ++ s')
+     else Nothing
+     
            
 reduceTrace :: Monad m => Reduce m -> Reduce m
 reduceTrace r e cs = do
@@ -66,6 +107,7 @@ reduce r (FVar x) cs = do
   case c of
     Just (cid, fids) -> r (Con cid (map FVar fids)) cs
     Nothing -> return (FVar x, cs)
+reduce r (LVar x) cs = return (LVar x, cs)
 
 match ::  CId -> [Atom] -> [Alt Expr] -> Expr
 match  cid es (Alt cid' xs c : as)
