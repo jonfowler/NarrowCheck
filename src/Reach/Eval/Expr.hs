@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
 module Reach.Eval.Expr where
 
 --import Reach.Lens
@@ -14,7 +13,7 @@ type FuncId = Int
 type FId = Int
 
 
-data Alt a = Alt !CId [LId] a deriving (Show, Functor)
+data Alt a = Alt !CId [LId] a deriving (Show, Functor, Foldable, Traversable)
 
 data Conts = Branch [Alt Expr]
            | Apply Expr deriving (Show)
@@ -45,6 +44,26 @@ data Atom
   -- is only evaluated once.
   | Con !CId [Atom] deriving Show
 
+
+closedExpr :: Expr -> Bool
+closedExpr = closedExpr' []
+
+closedExpr' :: [LId] -> Expr -> Bool 
+closedExpr' vs (Let x e e') = closedExpr' (x : vs) e && closedExpr' (x : vs) e'
+closedExpr' vs (Expr a cs) = closedAtom vs a && all (closedConts vs) cs
+
+closedAtom :: [LId] -> Atom -> Bool
+closedAtom vs (Fun _) = True
+closedAtom vs (EVar _) = True
+closedAtom vs (LVar v) = v `elem` vs
+closedAtom vs (FVar _) = True
+closedAtom vs (Lam v e) = closedExpr' (v : vs) e
+closedAtom vs (Con _ as) = all (closedAtom vs) as
+
+closedConts :: [LId] -> Conts -> Bool
+closedConts vs (Apply e) = closedExpr' vs e
+closedConts vs (Branch as) = all closedAlt as
+  where closedAlt (Alt _ vs' e) = closedExpr' (vs' ++ vs) e
 
 atom :: Atom -> Expr
 atom a = Expr a []

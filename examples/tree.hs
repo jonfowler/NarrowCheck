@@ -4,15 +4,19 @@ data Bool = True | False
 data Nat = Z | S Nat
 data Tree = Leaf | Node Tree Nat Tree
 
-reach x = all x (le s1) 
+reach x = or (le s4 x) (le s1 x)
 
 all t p = case t of
   Leaf -> True
   Node t1 x t2 -> and (p x) (and (all t1 p) (all t2 p))
 
+or x y = case x of
+  False -> y
+  True -> True
+
 and x y = case x of
-  True -> y
   False -> False
+  True -> y
 
 imp x y = case x of
   True -> y
@@ -28,6 +32,12 @@ le x y = case x of
     Z -> False
     S y2 -> le x2 y2
 
+ge x y = case y of
+  Z -> True
+  S y2 -> case x of
+    Z -> False
+    S x2 -> ge x2 y2
+
 add x y = case x of
   Z -> y 
   S x2 -> S (add x2 y) 
@@ -38,3 +48,4 @@ s2 = S s1
 
 s3 = S s2
 
+s4 = S s3

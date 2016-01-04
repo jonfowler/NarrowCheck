@@ -35,6 +35,8 @@ executable reach
                       FunctionalDependencies, 
                       FlexibleInstances, 
                       DeriveFunctor,
+                      DeriveFoldable,
+                      DeriveTraversable,
                       TypeFamilies
   other-modules:  Reach.Eval.Env,
     Reach.Eval.Expr,
