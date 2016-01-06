@@ -12,8 +12,9 @@ module Reach.Parser.Module (
   checkModule
   )where
 
-import Reach.Parser.Tokens hiding ((<|>), many)
-import Reach.Parser.Parse hiding ((<|>), many)
+import Text.Trifecta.Result
+import Reach.Parser.Tokens 
+import Reach.Parser.Parse 
 import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Map as M
@@ -95,8 +96,8 @@ parserOfModule = whitespace >> execStateT <$> parseModule' <*> pure emptyModule
 
 parseModule :: Monad m => String -> m Module
 parseModule s = case runParse parserOfModule s of
-  Left err -> fail . show $ err
-  Right m -> case runExcept m of 
+  Failure err -> fail . show $ err
+  Success m -> case runExcept m of 
     Left err -> fail err
     Right m -> return m
 

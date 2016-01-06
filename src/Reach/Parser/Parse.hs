@@ -1,5 +1,13 @@
 module Reach.Parser.Parse where
 
+import Control.Applicative
+import Text.Parser.Char
+import Text.Parser.Combinators
+import Text.Trifecta.Result
+import Text.Trifecta.Combinators
+import Text.Trifecta.Delta
+import qualified Text.Trifecta.Parser as T
+
 import Reach.Parser.Tokens
 import Control.Lens
 
@@ -72,7 +80,7 @@ parseCase = Case <$> (try (res "case") *> parseExp)
                  <*> (res "of" *> block parseAlt)
 
 parseApp :: Parser Expr
-parseApp = toApp <$> many1 parseInnerExp  --parseInnerExp
+parseApp = toApp <$> some parseInnerExp  --parseInnerExp
 
 toApp :: [Expr] -> Expr
 toApp = go . reverse

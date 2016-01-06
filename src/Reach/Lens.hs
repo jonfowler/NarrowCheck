@@ -6,10 +6,10 @@ module Reach.Lens
 
 import Control.Lens
 
-at' :: At m => Index m -> Lens' m (IxValue m)
-at' l = at l . _unsafeJust 
+at' :: (Show (Index m), At m) => Index m -> Lens' m (IxValue m)
+at' l = at l . _unsafeJust (show l)
 
-_unsafeJust :: Lens (Maybe a) (Maybe b) a b 
-_unsafeJust f (Just a) = Just <$> f a
-_unsafeJust f Nothing = error "Unsafe just failed to read value"    
+_unsafeJust :: String -> Lens (Maybe a) (Maybe b) a b 
+_unsafeJust s f (Just a) = Just <$> f a
+_unsafeJust s f Nothing = error $ "Failed to read the value: " ++ s ++ "of maybe in call to _unsafeJust"
 

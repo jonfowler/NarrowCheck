@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Reach.Parser.Tokens
   ( module Reach.Parser.Indent,
     ConId,
@@ -12,6 +11,13 @@ module Reach.Parser.Tokens
     reserved,
     whitespace,
     ) where
+
+import Text.Parser.Char
+import Text.Parser.Combinators
+import Text.Trifecta.Result
+import Text.Trifecta.Combinators
+import Text.Trifecta.Delta
+import qualified Text.Trifecta.Parser as T
 
 import Reach.Parser.Indent
 import Control.Monad

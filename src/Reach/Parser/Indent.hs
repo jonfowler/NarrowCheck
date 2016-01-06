@@ -7,48 +7,59 @@ module Reach.Parser.Indent (
   sameIndent,
   looseIndent,
   getColumn,
-  module Text.Parsec,
   Parser
   ) where
 
-import Text.Parsec hiding (parseTest)
+--import Text.Parsec hiding (parseTest)
+import Text.Parser.Char
+import Text.Parser.Combinators
+import Text.Trifecta.Result
+import Text.Trifecta.Combinators
+import Text.Trifecta.Delta
+import qualified Text.Trifecta.Parser as T
+      
+import Data.Int
+import Control.Monad.State
 import Control.Monad.Identity
+import Reach.Lens
 
-data ParseState = ParseState {indentLevel :: Int }
-type Parser a = ParsecT String ParseState Identity a
-type ParserT m a = ParsecT String ParseState m a
+data ParseState = ParseState {_indentLevel :: Int64 }
+makeLenses ''ParseState
+                  
+type Parser a = StateT ParseState T.Parser a   --ParsecT String ParseState Identity a
+--type ParserT m a =    ParsecT String ParseState m a
 
-runParse :: Parser a -> String -> Either ParseError a
-runParse p = runParser p startState ""  
+runParse :: Parser a -> String -> Result a
+runParse p = fmap fst . T.parseString (runStateT p startState) mempty
 
 startState :: ParseState
-startState = ParseState {indentLevel = 1}
+startState = ParseState {_indentLevel = 1}
 
-writeIndent :: Int -> ParseState -> ParseState
-writeIndent n (ParseState _) = ParseState n
+--writeIndent :: Int -> ParseState -> ParseState
+--writeIndent n (ParseState _) = ParseState n
 
-getIndent :: Parser Int
-getIndent = indentLevel <$> getState
+--getIndent :: Parser Int
+--getIndent = indentLevel <$> getState
 
-putIndent :: Int -> Parser ()
-putIndent n = modifyState (writeIndent n)
+--putIndent :: Int -> Parser ()
+--putIndent n = modifyState (writeIndent n)
 
-localIndent :: Int -> Parser a -> Parser a
+localIndent :: Int64 -> Parser a -> Parser a
 localIndent n p = do
-  m <- getIndent
-  putIndent n
+  m <- use indentLevel
+  indentLevel .= n
   a <- p
-  putIndent m
+  indentLevel .= m
   return a
 
-getColumn :: Parser Int
-getColumn = sourceColumn <$> getPosition 
+getColumn :: Parser Int64
+getColumn = column <$> position 
 
 guardParse :: String -> Bool -> Parser ()
-guardParse err b = if b then return () else unexpected err 
+guardParse err b = if b then return () else lift . raiseErr $ failed err 
 
-checkIndent :: (Int -> Int -> Bool) -> Parser ()
-checkIndent f = f <$> getIndent <*> getColumn >>= guardParse "Parse error: possibly indentation" 
+checkIndent :: (Int64 -> Int64 -> Bool) -> Parser ()
+checkIndent f = f <$> use indentLevel <*> getColumn >>= guardParse "Parse error: possibly indentation" 
 
 strictIndent :: Parser ()
 strictIndent = checkIndent (<) 
