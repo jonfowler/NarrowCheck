@@ -7,12 +7,16 @@ module Reach.Parser.Module (
   moduleDef,
   moduleTypeDef,
   moduleCon,
+  moduleImports,
+  moduleName,
 
   parseModule,
-  checkModule
+  checkModule,
+  mergeModules
   )where
 
 import Text.Trifecta.Result
+import Text.Parser.Combinators
 import Reach.Parser.Tokens 
 import Reach.Parser.Parse 
 import Control.Monad.Except
@@ -24,20 +28,46 @@ import Control.Lens
 import Control.Applicative
 
 data Module = Module
-  {_moduleData :: Map TypeId Data,
+  {_moduleName :: [String],
+   _moduleImports :: [[String]],
+   _moduleData :: Map TypeId Data,
    _moduleDef :: Map VarId Def,  
    _moduleTypeDef :: Map VarId TypeDef,
    _moduleCon :: Map ConId (Con Type)
   } deriving (Show)
 makeLenses ''Module
 
-emptyModule :: Module
-emptyModule = Module
-  { _moduleData = M.empty,
+emptyModule :: [String] -> [[String]] -> Module
+emptyModule nam imps = Module
+  { _moduleName = nam,
+    _moduleImports = imps,
+    _moduleData = M.empty,
     _moduleDef = M.empty,
     _moduleTypeDef = M.empty,
     _moduleCon = M.empty
   }
+
+mergeModules :: Monad m => Module -> [Module] -> m Module
+mergeModules m [] = return m
+mergeModules m (n : ns) = (mergeModules m ns) >>= \m' -> mergeModule' m'  n
+
+mergeModule' :: Monad m => Module -> Module -> m Module
+mergeModule' m n | null dataIntersect && null defIntersect
+                   && null typedefIntersect && null conIntersect
+                   = return $ m {_moduleData = M.union (m ^. moduleData) (n ^. moduleData),
+                        _moduleDef = M.union (m ^. moduleDef) (n ^. moduleDef),
+                        _moduleTypeDef = M.union (m ^. moduleTypeDef) (n ^. moduleTypeDef),
+                        _moduleCon = M.union (m ^. moduleCon) (n ^. moduleCon)
+                       }
+                 | otherwise = fail "error overlapping namespaces"
+                     
+
+  where
+    dataIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
+    defIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
+    typedefIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
+    conIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
+
 
 
 addData :: Data -> StateT Module (Except String) ()
@@ -49,6 +79,8 @@ addData d = do
                   sequence_ (addCon <$> (d ^. dataCon))
  where tid = d ^. dataName
 
+addImport :: [String] -> StateT Module (Except String) ()
+addImport i = moduleImports %= (i:)
 --      return $ Module (M.insert tid d ds cs) defs tds
 --
 addDef :: Def -> StateT Module (Except String) ()
@@ -88,7 +120,10 @@ conToType :: Con Type -> TypeId -> Type
 conToType (Con _ ts) tid = foldr (:->) (Type tid) ts
 
 parserOfModule :: Parser (Except String Module)
-parserOfModule = whitespace >> execStateT <$> parseModule' <*> pure emptyModule
+parserOfModule = do
+  nam <- whitespace >> parseModuleHead <|> return []
+  imps <- many parseImport
+  (execStateT <$> parseModule' <*> pure (emptyModule nam imps)) <* eof
    where parseModule' = sequence_ <$> many (
                    addData <$> parseData
                <|> addDef <$> parseDef

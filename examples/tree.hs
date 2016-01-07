@@ -6,8 +6,10 @@ data Tree = Leaf | Node Tree Nat Tree
 
 reach x = or (le s4 x) (le s1 x)
 
+-- testing comments
+          
 all t p = case t of
-  Leaf -> True
+  Leaf -> True -- this is a test
   Node t1 x t2 -> and (p x) (and (all t1 p) (all t2 p))
 
 or x y = case x of
@@ -18,12 +20,8 @@ and x y = case x of
   False -> False
   True -> y
 
-imp x y = case x of
-  True -> y
-  False -> True
-
-not x = case x of
-  True -> False
+imp x y = case x of -- further test
+  True -> y 
   False -> True
 
 le x y = case x of

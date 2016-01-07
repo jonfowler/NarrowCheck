@@ -41,6 +41,18 @@ parseData = try (top "data") >> (Data
       <$> (strictIndent >> parseTypeId)
       <*> (res "=" >> sepBy1 (strictIndent >> parseCon parseType) (res "|")))
 
+parseModuleHead :: Parser [String]            
+parseModuleHead = try (top "module") >> parseModuleName <* lexeme (string "where")
+
+parseImport :: Parser [String]
+parseImport = try (top "import") >>
+              strictIndent >>
+              parseModuleName
+              
+
+parseModuleName :: Parser [String]
+parseModuleName = lexeme (sepBy1 ((:) <$> upper <*> many alphaNum) (char '.'))
+
 parseCon :: Parser a -> Parser (Con a)
 parseCon p = Con <$> parseConId <*> many (strictIndent >> p)
       

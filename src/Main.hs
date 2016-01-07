@@ -13,7 +13,6 @@ import System.Environment
 import System.Console.GetOpt
 import System.IO.Error
 
-
 data Flag 
   = DataBound Int
 
@@ -36,12 +35,19 @@ main = do
                       usageInfo header options
   where header = "Usage: reach [OPTION...] FILE.rh"
 
+toFileName :: [String] -> FilePath
+toFileName [a] = a ++ ".hs"
+toFileName (a : as) = a ++ "/" ++ toFileName as
+  
 go :: FilePath -> [Flag] -> IO ()
 go fn flags = do
   rf <- readFile fn
   m <- P.parseModule rf
-  P.checkModule m
-  let env = C.convModule m
+  let fns = map toFileName $ ["Prelude"] : m ^. P.moduleImports
+  ms <- mapM (readFile >=> P.parseModule) fns
+  m' <- P.mergeModules m ms
+  P.checkModule m'
+  let env = C.convModule m'
       fid = env ^. funcIds .at' "reach"
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
   let rs = runF fid env

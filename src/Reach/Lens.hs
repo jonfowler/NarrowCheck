@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Reach.Lens 
   ( module Control.Lens,
     at'

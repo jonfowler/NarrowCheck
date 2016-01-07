@@ -5,7 +5,6 @@ module Reach.Parser.Indent (
   localIndent,
   strictIndent,
   sameIndent,
-  looseIndent,
   getColumn,
   Parser
   ) where
@@ -33,7 +32,7 @@ runParse :: Parser a -> String -> Result a
 runParse p = fmap fst . T.parseString (runStateT p startState) mempty
 
 startState :: ParseState
-startState = ParseState {_indentLevel = 1}
+startState = ParseState {_indentLevel = 0}
 
 --writeIndent :: Int -> ParseState -> ParseState
 --writeIndent n (ParseState _) = ParseState n
@@ -63,9 +62,6 @@ checkIndent f = f <$> use indentLevel <*> getColumn >>= guardParse "Parse error:
 
 strictIndent :: Parser ()
 strictIndent = checkIndent (<) 
-
-looseIndent :: Parser ()
-looseIndent = checkIndent (\ind col -> col /= 1 && ind <= col) 
 
 sameIndent :: Parser ()
 sameIndent = checkIndent (==) 
