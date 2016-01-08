@@ -15,5 +15,6 @@ partial (App e e') = case partial e of
 partial (Parens e) = Parens (partial e)
 partial (ConE cid es) = ConE cid (map partial es)
 partial (Var v) = Var v
+partial (Op e v e') = App (App (Var v) (partial e)) (partial e')
 
 

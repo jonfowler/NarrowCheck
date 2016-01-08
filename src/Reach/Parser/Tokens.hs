@@ -3,15 +3,18 @@ module Reach.Parser.Tokens
     ConId,
     VarId,
     TypeId,
+    OpId,
     parseVarId,
     parseConId,
     parseTypeId,
+    parseOpId,
     res,
     top,
     reserved,
     lexeme,
     whitespace,
-    notReserved
+    notReserved,
+    notReservedOp
     ) where
 
 import Control.Applicative
@@ -26,6 +29,7 @@ import Reach.Parser.Indent
 import Control.Monad
 
 type ConId = String 
+type OpId = String 
 type VarId = String 
 type TypeId = String
 
@@ -33,7 +37,7 @@ reservedT :: [String]
 reservedT = ["case", "of", "data", "import", "let", "in", "module", "where"]
 
 reservedOps :: [String]
-reservedOps = ["->", "=", "(", ")", "::", "|","--","{-","-}"]
+reservedOps = ["->", "=", "|","--","{-","-}"]
 
 notReserved :: Parser String 
 notReserved = do
@@ -42,8 +46,23 @@ notReserved = do
     then unexpected $ "unexpected reserved word: " ++ a
     else return a
 
+op :: Parser Char 
+op = oneOf "*-+&^%$£!|<>.,/?:;@#~="
+
+notReservedOp :: Parser String 
+notReservedOp = do
+  a <- some op 
+  if a `elem` reservedOps
+    then unexpected $ "unexpected reserved operation: " ++ a
+    else return a
+
+parseOpId :: Parser String
+parseOpId = lexeme $ notReservedOp
+
 lexeme :: Parser a -> Parser a
 lexeme p = p <* whitespace 
+
+           
 
 --word :: String -> Parser () 
 --word = foldr ((*>) . char) (return ()) 

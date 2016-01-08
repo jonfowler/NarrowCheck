@@ -1,44 +1,13 @@
 
-
-data Bool = True | False
-data Nat = Z | S Nat
 data Tree = Leaf | Node Tree Nat Tree
 
-reach x = or (le s4 x) (le s1 x)
+reach x = (s4 <= x) || (s1 <= x)
 
 -- testing comments
           
 all t p = case t of
   Leaf -> True -- this is a test
-  Node t1 x t2 -> and (p x) (and (all t1 p) (all t2 p))
-
-or x y = case x of
-  False -> y
-  True -> True
-
-and x y = case x of
-  False -> False
-  True -> y
-
-imp x y = case x of -- further test
-  True -> y 
-  False -> True
-
-le x y = case x of
-  Z -> True
-  S x2 -> case y of
-    Z -> False
-    S y2 -> le x2 y2
-
-ge x y = case y of
-  Z -> True
-  S y2 -> case x of
-    Z -> False
-    S x2 -> ge x2 y2
-
-add x y = case x of
-  Z -> y 
-  S x2 -> S (add x2 y) 
+  Node t1 x t2 -> p x && all t1 p && all t2 p
 
 s1 = S Z
 
@@ -47,3 +16,17 @@ s2 = S s1
 s3 = S s2
 
 s4 = S s3
+
+del n t = case t of
+  Leaf -> Leaf
+  Node t1 a t2 -> case a < n of
+    True -> Node t1 a (del n t2)
+    False -> case n > a of
+      True -> Node (del n t1) a t2
+      False -> ext t1 t2
+
+
+
+ext t1 t2 = case t1 of
+  Leaf -> t2
+  Node t11 a t12 -> Node t11 a (ext t12 t2)

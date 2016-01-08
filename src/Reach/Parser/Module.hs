@@ -182,15 +182,23 @@ checkScopes m = mapMOf_ (moduleDef . folded) (checkScopeDef m) m
 
 checkScopeDef :: Module -> Def -> Except String ()
 checkScopeDef m d = mapM_ (checkLocal m M.empty) (d ^. defArgs) >>
-                    checkScopeExp m M.empty (d ^. defBody)
+                    checkScopeExp m (M.fromList (map (\a -> (a,())) $ d ^. defArgs)) (d ^. defBody)
 
 checkScopeExp :: Module -> Map VarId () -> Expr -> Except String ()
-checkScopeExp m locals (Case e as) = checkScopeExp m locals e <|>
-   asum (checkScopeAlt m locals <$> as)
-checkScopeExp m locals (App e e') = checkScopeExp m locals e <|> checkScopeExp m locals e'
+checkScopeExp m locals (Case e as) = checkScopeExp m locals e <||>
+   sequence_ (checkScopeAlt m locals <$> as)
+checkScopeExp m locals (App e e') = checkScopeExp m locals e <||> checkScopeExp m locals e'
 checkScopeExp m locals (Parens e) = checkScopeExp m locals e
 checkScopeExp m locals (Var vid) = checkScope m locals vid
+checkScopeExp m locals (Op e v e') = checkScopeExp m locals e <||> checkScope m locals v <||>
+                                     checkScopeExp m locals e'
 checkScopeExp m locals (ConE cid es) = mapM_ (checkScopeExp m locals) es 
+
+(<||>) :: MonadError e m => m a -> m a -> m ()
+e <||> e' = do
+  e
+  e'
+  return ()
 
 checkScopeAlt :: Module -> Map VarId () -> Alt -> Except String ()
 checkScopeAlt m locals a = do

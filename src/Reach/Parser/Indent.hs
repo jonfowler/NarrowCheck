@@ -4,6 +4,7 @@ module Reach.Parser.Indent (
   checkIndent,
   localIndent,
   strictIndent,
+  thisstrictIndent,
   sameIndent,
   getColumn,
   Parser
@@ -56,6 +57,16 @@ getColumn = column <$> position
 
 guardParse :: String -> Bool -> Parser ()
 guardParse err b = if b then return () else lift . raiseErr $ failed err 
+
+thisstrictIndent :: Parser ()
+thisstrictIndent = do
+  i <- use indentLevel
+  c <- getColumn
+  if i < c 
+    then return ()
+    else lift . raiseErr $ failed "this strictindent"
+
+
 
 checkIndent :: (Int64 -> Int64 -> Bool) -> Parser ()
 checkIndent f = f <$> use indentLevel <*> getColumn >>= guardParse "Parse error: possibly indentation" 
