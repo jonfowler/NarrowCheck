@@ -19,12 +19,9 @@ executable reach
   main-is:             Main.hs
   -- other-modules:       
   build-depends:       base ==4.*, 
-                       parsec ==3.*, 
                        mtl >=2.2.1, 
-                       uniplate == 1.*, 
                        containers == 0.*, 
                        lens == 4.*, 
-                       dlist == 0.7.*,
                        wl-pprint == 1.2,
                        parsers == 0.12.3,
                        trifecta == 1.5.2
@@ -54,3 +51,4 @@ executable reach
     Reach.Parser.Module,
     Reach.Parser.Parse,
     Reach.Parser.Tokens
+    Reach.Parser.ConReduce

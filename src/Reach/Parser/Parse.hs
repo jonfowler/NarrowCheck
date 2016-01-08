@@ -109,7 +109,18 @@ parseInnerExpr = strictIndent >> (  try (Var <$> parseVarId)
                                <|> parseParens )
 
 parseParens :: Parser Expr
-parseParens = Parens <$> between (res "(") (res ")") parseExpr
+parseParens = Parens <$> between (res "(") (res ")") ( 
+     (do
+       e <- try parseExpr
+       case e of
+         (Case _ _) -> return e
+         (Op _ _ _) -> return e
+         _ -> do
+           r <- optional parseOpId
+           case r of
+             Just o -> return $ App (Var o) e
+             Nothing -> return e)
+     <|> Var <$> try parseOpId )
 
 parseAlt :: Parser Alt
 parseAlt = Alt <$> try (parseCon parseVarId)
