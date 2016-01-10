@@ -20,6 +20,9 @@ evalLazy :: MonadChoice m => Atom -> [Conts] -> ReachT m Atom
 evalLazy e conts = do
    c <- fix reduce e conts
    case c of 
+     (Lam v e, []) -> do
+        x <- newFVar
+        evalLazy (Lam v e) [Apply . atom . FVar $ x] 
      (e, []) -> return e
      (FVar x, Branch as : cs) -> do
        (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
@@ -39,6 +42,9 @@ evalBase e = do
        xs <- fvars x vs
        free . at x ?= (cid, xs)
        evalBase (Con cid (map FVar xs), Branch as : cs)
+    Right (Lam v e, []) -> do
+      x <- newFVar
+      evalBase (Lam v e, [Apply . atom . FVar $ x])
     Right (a, ss) -> return a
     o -> error (show o)
 
@@ -47,14 +53,15 @@ evalInter (e, cs) = do
   c <- fix reduce e cs
   case c of
     (LVar v, cs') -> return (Left (LVar v, cs'))
-    (FVar x, cs') -> do
+    (FVar x, cs') -> do 
       i <- interweaver cs' 
       case i of
         Left cs'' -> return . Left $ (FVar x, cs'')
-        Right ((cid, as), cs'', ss) -> do
-          let es = fmap (Expr (FVar x) . return . Branch) (transposeSemiAtom as)
-          xs <- evars es 
-          return . Right $ (Con cid (map EVar xs), (x, cs'') : ss)
+--        Right ((cid, as), cs'', ss) -> do
+--          let es = fmap (Expr (FVar x) . return . Branch) (transposeSemiAtom as)
+--          xs <- evars es 
+--          s <- get
+--          trace (printDoc (printState (Expr e cs) s)) (return . Right $ (Con cid (map EVar xs), (x, cs'') : ss))
     (Con c es, []) -> return $ Right (Con c es, [])
     (Lam x e, []) -> return $ Right (Lam x e, [])
 
@@ -62,7 +69,7 @@ evalInter (e, cs) = do
 addCont :: Conts -> Either [Conts] (SemiAtom, [Conts], [Susp]) ->
                      Either [Conts] (SemiAtom, [Conts], [Susp]) 
 addCont c (Left cs) = Left (c : cs)
-addCont c (Right (e, cs', es)) = Right (e, c : cs', es)
+addCont c (Right (e, cs', es)) = Right (e, cs', es)
 
 type SemiAtom = (CId, [Alt [Atom]])
 
@@ -77,16 +84,17 @@ interweaver (Branch as : cs) = do
   i <- interweave as  
   case i of 
     Left as' -> addCont (Branch as') <$> interweaver cs
-    Right (e, es) -> return (Right (e, [], es))
+--    Right (e, es) -> return (Right (e, cs , es))
 
 interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] (SemiAtom, [Susp]))
 interweave as = do
   as' <- (mapM . mapM) (bindLets >=> evalInter) as
-  case consol' as' of 
-    Left as'' -> return (Left as'')
-    Right as'' -> case consolidate as'' of
-      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
-      Just e -> return . Right $ e
+  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
+--  case consol' as' of 
+--    Left as'' -> return (Left as'')
+--    Right as'' -> trace "blah" $ case consolidate as'' of
+--      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
+--      Just e -> trace "blah2" $ return . Right $ e
   
 consol' :: [Alt (Either Expr' (Atom, [Susp]))] -> Either [Alt Expr] [Alt (Atom, [Susp])]
 consol' [] = Right []
@@ -151,7 +159,7 @@ match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
   | cid == cid' = replaceLVars xs es c  
   | otherwise   = match cid es as
-match _ _ [] = error "no match for constructor in case"
+match _ _ [] = error "REACH_ERROR: no match for constructor in case"
                          
 
 binds :: Monad m => [LId] -> [Expr] -> Expr -> ReachT m Expr 
@@ -219,6 +227,7 @@ newFVar = do
   x <- use nextFVar
   nextFVar += 1
   freeDepth . at x ?= 0
+  topFrees %= (x :)
   return x
 
 fvar :: Monad m => FId -> ReachT m FId

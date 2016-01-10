@@ -2,9 +2,9 @@ module Tree where
 
 data Tree = Leaf | Node Tree Nat Tree
 
-reach = prop_ordDel 
+--reach = prop_ordDel 
 
---reach x = (s4 <= x) || (s1 <= x)
+reach x = (s4 <= x) || (s1 <= x)
 
 s1 = S Z
 

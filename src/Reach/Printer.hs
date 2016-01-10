@@ -62,9 +62,9 @@ printExpr' s (Expr e cs) = printConts s (printAtom' s e) cs
 printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
 printConts s d [] = d
 printConts s (d , _) (Branch as : cs) = printConts s (text "case"
-                                      <+> d
-                                      <+> nest 2 (text "of" <$>
-                                              (vsep . map (printAlt s (printExpr s))) as)
+                                      <+> nest 2 (d
+                                      <+>  (text "of" <$>
+                                              (vsep . map (printAlt s (printExpr s))) as))
                            , True) cs
 
 printConts s d cs@(Apply _ : _) =  let (es , cs') = allApps cs in

@@ -55,20 +55,20 @@ go fn flags = do
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
       fal = env ^. constrIds . at' "False"
   let rs = runF fid env
-  printResults (take 10 . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
+  printResults (take 100 .  rights $ rs)
+  -- filter (\(Con cid _, _) -> cid == fal) .
 
 
 printResults :: [(Atom, Env)] -> IO ()
-printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> " ++ printFVar env 0
-                                           ++ "\n     " ++ printFVar env 1))
+printResults = mapM_ (\(e,env) -> do {putStrLn (showAtom env e ++ " ->"); printFVars (env ^. topFrees) env})
+
+printFVars :: [Int] -> Env -> IO ()
+printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
 runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
 runF fid env = runReach
                  (do
-                    x <- newFVar
-                    y <- newFVar
-                    evalLazy (Fun fid)
-                       [Apply . atom . FVar $ x, Apply . atom . FVar $ y]
+                    evalBase (Fun fid, [])
                  )
                  env
 

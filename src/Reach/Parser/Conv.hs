@@ -69,6 +69,7 @@ convModule i m = Env {
              _nextEVar = 0,
              _freeDepth = I.empty,
              _maxDepth = i,
+             _topFrees = [],
 
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
