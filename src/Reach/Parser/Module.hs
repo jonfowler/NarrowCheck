@@ -125,8 +125,8 @@ parserOfModule = do
   imps <- many parseImport
   (execStateT <$> parseModule' <*> pure (emptyModule nam imps)) <* eof
    where parseModule' = sequence_ <$> many (
-                   addData <$> parseData
-               <|> addDef <$> parseDef
+                   addData <$> try parseData
+               <|> addDef <$> try parseDef
                <|> addTypeDef <$> parseTypeDef)
 
 parseModule :: Monad m => String -> m Module

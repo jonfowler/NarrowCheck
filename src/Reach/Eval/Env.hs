@@ -1,6 +1,6 @@
 module Reach.Eval.Env (
   Env(..),
-  funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames,
+  funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames, constrIds,
   showAtom, printFVar)
   where
 
@@ -17,13 +17,15 @@ data Env = Env {
 
   _free :: IntMap (CId, [FId]),
   _nextFVar :: FId,
+  _freeDepth :: IntMap Int,
 
   _env :: IntMap Expr,
   _nextEVar :: LId,
 
   _funcNames :: IntMap String,
   _funcIds :: Map String FuncId,
-  _constrNames :: IntMap String
+  _constrNames :: IntMap String,
+  _constrIds :: Map String CId
   } deriving Show
 
 makeLenses ''Env

@@ -41,7 +41,7 @@ reservedOps = ["->", "=", "|","--","{-","-}"]
 
 notReserved :: Parser String 
 notReserved = do
-  a <- (:) <$> lower <*> many alphaNum
+  a <- (:) <$> lower <*> many (alphaNum <|> char '_')
   if a `elem` reservedT
     then unexpected $ "unexpected reserved word: " ++ a
     else return a

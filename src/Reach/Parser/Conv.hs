@@ -71,7 +71,8 @@ convModule m = Env {
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
 
-             _constrNames = c ^. convertCon . mapFromInt 
+             _constrNames = c ^. convertCon . mapFromInt,
+             _constrIds = c ^. convertCon . mapToInt 
              }
   where c = setupConvert m
 

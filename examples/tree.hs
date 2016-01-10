@@ -2,7 +2,9 @@ module Tree where
 
 data Tree = Leaf | Node Tree Nat Tree
 
-reach x = (s4 <= x) || (s1 <= x)
+reach = prop_ordDel 
+
+  --(s4 <= x) || (s1 <= x)
 
 s1 = S Z
 
@@ -12,9 +14,10 @@ s3 = S s2
 
 s4 = S s3
 
-all t p = case t of
+all :: (Nat -> Bool) -> Tree ->  Bool
+all p t = case t of
   Leaf -> True 
-  Node t1 x t2 -> p x && all t1 p && all t2 p
+  Node t1 x t2 -> p x && all p t1 && all p t2
 
 del n t = case t of
   Leaf -> Leaf

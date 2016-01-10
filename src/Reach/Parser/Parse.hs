@@ -90,9 +90,9 @@ parseExpr :: Parser Expr
 parseExpr = parseCase <|> parseOp
                  
 parseOp :: Parser Expr                 
-parseOp = toOp <$> parseApp <*> optional (do
+parseOp = toOp <$> parseApp <*> optional (try $ do
                                           strictIndent
-                                          o <- try parseOpId
+                                          o <- parseOpId
                                           e <- parseExpr
                                           return (o , e))
 

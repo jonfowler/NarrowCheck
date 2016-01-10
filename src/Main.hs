@@ -50,14 +50,24 @@ go fn flags = do
   let env = C.convModule m'
       fid = env ^. funcIds .at' "reach"
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
+      fal = env ^. constrIds . at' "False"
   let rs = runF fid env
-  printResults (take 10 rs)
+  printResults (take 10 . filter (\(Con cid _, _) -> cid == fal) $ rs)
+
 
 printResults :: [(Atom, Env)] -> IO ()
-printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> " ++ printFVar env 0))
+printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> " ++ printFVar env 0
+                                           ++ "\n     " ++ printFVar env 1))
 
 runF :: FId -> Env -> [(Atom, Env)]
-runF fid env = runReach (newFVar >>= \x -> evalLazy (Fun fid) [Apply . atom . FVar $ x]) env
+runF fid env = runReach
+                 (do
+                    x <- newFVar
+                    y <- newFVar
+                    evalLazy (Fun fid)
+                       [Apply . atom . FVar $ x, Apply . atom . FVar $ y]
+                 )
+                 env
 
 
 --runF :: FId -> Env -> [(Expr, Env)]
