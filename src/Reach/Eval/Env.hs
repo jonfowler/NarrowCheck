@@ -1,6 +1,9 @@
 module Reach.Eval.Env (
   Env(..),
-  funcs,free,nextFVar,env,nextEVar,funcNames,funcIds,constrNames, constrIds,
+  funcs,
+  free, nextFVar, freeDepth, maxDepth,
+  env, nextEVar,
+  funcNames, funcIds, constrNames, constrIds,
   showAtom, printFVar)
   where
 
@@ -18,6 +21,7 @@ data Env = Env {
   _free :: IntMap (CId, [FId]),
   _nextFVar :: FId,
   _freeDepth :: IntMap Int,
+  _maxDepth :: Int,
 
   _env :: IntMap Expr,
   _nextEVar :: LId,

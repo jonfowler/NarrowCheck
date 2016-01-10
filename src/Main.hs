@@ -5,9 +5,12 @@ import Reach.Eval.Cont
 import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
+import Reach.Eval.Monad
 import Reach.Printer
       
 import Control.Monad.Except
+
+import Data.Either       
 
 import System.Environment
 import System.Console.GetOpt
@@ -47,19 +50,19 @@ go fn flags = do
   ms <- mapM (readFile >=> P.parseModule) fns
   m' <- P.mergeModules m ms
   P.checkModule m'
-  let env = C.convModule m'
+  let env = C.convModule 4 m'
       fid = env ^. funcIds .at' "reach"
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
       fal = env ^. constrIds . at' "False"
   let rs = runF fid env
-  printResults (take 10 . filter (\(Con cid _, _) -> cid == fal) $ rs)
+  printResults (take 10 . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
 
 
 printResults :: [(Atom, Env)] -> IO ()
 printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " -> " ++ printFVar env 0
                                            ++ "\n     " ++ printFVar env 1))
 
-runF :: FId -> Env -> [(Atom, Env)]
+runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
 runF fid env = runReach
                  (do
                     x <- newFVar

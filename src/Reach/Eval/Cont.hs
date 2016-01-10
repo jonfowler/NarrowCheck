@@ -9,12 +9,8 @@ import Reach.Printer
 import Debug.Trace
 import Data.List
 
-runReach :: Monad m => ReachT m a -> Env -> m (a , Env)
-runReach m s = do
-  r <- runExceptT (runStateT m s)
-  case r of
-    Left err -> fail . show $ err
-    Right a -> return a
+runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
+runReach m s = runExceptT (runStateT m s)
 
 type Reduce m = Atom -> [Conts] -> ReachT m Expr' 
 type Expr' = (Atom, [Conts])
@@ -27,7 +23,7 @@ evalLazy e conts = do
      (e, []) -> return e
      (FVar x, Branch as : cs) -> do
        (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
-       xs <- newFVars vs
+       xs <- fvars x vs
        free . at x ?= (cid, xs)
        evalLazy (Con cid (map FVar xs)) (Branch as : cs)
 
@@ -40,7 +36,7 @@ evalBase e = do
   case r of
     Left (FVar x, Branch as : cs) -> do
        (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
-       xs <- newFVars vs
+       xs <- fvars x vs
        free . at x ?= (cid, xs)
        evalBase (Con cid (map FVar xs), Branch as : cs)
     Right (a, ss) -> return a
@@ -214,36 +210,31 @@ replaceAtom v a (Lam x e)
   | otherwise = Lam x <$> (replaceLVar v a e)
 replaceAtom v a (FVar x) = return $ FVar x
 replaceAtom v a (Con c as) = Con c <$> (mapM (replaceAtom v a) as)
---                               Cont (replaceLVarExpr v e e')
---                                    (map replaceConts as)
---  where replaceConts (Branch as) = Branch $ (fmap . fmap) (replaceLVar v e) as
---        replaceConts (Apply e') = Apply $ replaceLVarExpr v e e'
 
---replaceLVarExpr :: LId -> Expr -> Expr -> Expr
---replaceLVarExpr lx ex (Let x e e') = Let x (replaceLVarExpr lx ex e) (replaceLVarExpr lx ex e')
---replaceLVarExpr lx ex (Fun f) = Fun f
---replaceLVarExpr lx ex (EVar x) = EVar x
---replaceLVarExpr lx ex (LVar lx')
---  | lx == lx' = ex
---  | otherwise = LVar lx'
---replaceLVarExpr lx ex (App e e') = App (replaceLVarExpr lx ex e) (replaceLVarExpr lx ex e')
---replaceLVarExpr lx ex (Lam x e)
---  | x == lx = Lam x e
---  | otherwise = Lam x (replaceLVarExpr lx ex e)
---replaceLVarExpr lx ex (Case e as) = Case (replaceLVarExpr lx ex e) (map replaceAlt as)
---    where replaceAlt (Alt cid xs e') = Alt cid xs (replaceLVarExpr lx ex e')
---replaceLVarExpr lx ex (Con cid es) = Con cid (fmap (replaceLVarExpr lx ex) es)
---replaceLVarExpr lx e (FVar x) = FVar x 
-
-newFVars :: Monad m => Int -> StateT Env m [FId]
+newFVars :: Monad m => Int -> ReachT m [FId]
 newFVars n = replicateM n newFVar
 
-newFVar :: Monad m => StateT Env m FId
+newFVar :: Monad m => ReachT m FId
 newFVar = do
   x <- use nextFVar
   nextFVar += 1
+  freeDepth . at x ?= 0
   return x
 
+fvar :: Monad m => FId -> ReachT m FId
+fvar xo = do
+  x <- use nextFVar
+  nextFVar += 1
 
+  maxd <- use maxDepth
+  d <- use (freeDepth . at' xo)
 
+  if d < maxd 
+     then do
+       freeDepth . at x ?= d + 1
+       return x
+     else throwError DataLimitFail
+
+fvars :: Monad m => FId -> Int -> ReachT m [FId]
+fvars xo n = replicateM n (fvar xo)
 

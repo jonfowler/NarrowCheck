@@ -58,8 +58,8 @@ setupConvert m = Convert
 setupConv :: Ord a => [a] -> State (Conv a) ()
 setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
-convModule :: S.Module -> Env
-convModule m = Env {
+convModule :: Int -> S.Module -> Env
+convModule i m = Env {
              _funcs = I.fromList $ map (convFun c) (M.elems $ m ^. S.moduleDef),
 
              _free = I.empty,
@@ -67,6 +67,8 @@ convModule m = Env {
 
              _env = I.empty,
              _nextEVar = 0,
+             _freeDepth = I.empty,
+             _maxDepth = i,
 
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
