@@ -80,7 +80,7 @@ atom a = Expr a []
 
 data Func =
   Func {_body :: Expr,
-        _vars :: Int
+        _vars :: !Int
        } deriving Show
 
 makeLenses ''Func

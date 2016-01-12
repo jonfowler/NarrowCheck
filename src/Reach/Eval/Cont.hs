@@ -12,112 +12,125 @@ import Data.List
 runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
 runReach m s = runExceptT (runStateT m s)
 
-type Reduce m = Atom -> [Conts] -> ReachT m Expr' 
+type Reduce m = Atom -> [Conts] -> ReachT m Susp 
 type Expr' = (Atom, [Conts])
-type Susp = (FId, [Conts])
+--type Susp = (FId, [Conts])
 
-evalLazy :: MonadChoice m => Atom -> [Conts] -> ReachT m Atom
-evalLazy e conts = do
+data Susp = Susp FId [Conts]
+          | SuspL LId [Conts]
+          | Fin Atom deriving Show
+
+evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
+evalLazy (e, conts) = do
    c <- fix reduce e conts
    case c of 
-     (Lam v e, []) -> do
+     Fin (Lam v e) -> do
         x <- newFVar
-        evalLazy (Lam v e) [Apply . atom . FVar $ x] 
-     (e, []) -> return e
-     (FVar x, Branch as : cs) -> do
+        evalLazy (Lam v e, [Apply . atom . FVar $ x])
+     Fin a -> return a
+     Susp x (Branch as : cs) -> do
        (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
        xs <- fvars x vs
        free . at x ?= (cid, xs)
-       evalLazy (Con cid (map FVar xs)) (Branch as : cs)
+       evalLazy (Con cid (map FVar xs), (Branch as : cs))
+     SuspL v _ -> error "Should not be suspended on local variable in evalLazy"
 
 choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
 choose _ = foldr ((<|>) . return) memp 
 
-evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
-evalBase e = do
-  r <- evalInter e
-  case r of
-    Left (FVar x, Branch as : cs) -> do
-       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
-       xs <- fvars x vs
-       free . at x ?= (cid, xs)
-       evalBase (Con cid (map FVar xs), Branch as : cs)
-    Right (Lam v e, []) -> do
-      x <- newFVar
-      evalBase (Lam v e, [Apply . atom . FVar $ x])
-    Right (a, ss) -> return a
-    o -> error (show o)
-
-evalInter :: Monad m => Expr' -> ReachT m (Either Expr' (Atom, [Susp]) )
+--evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
+--evalBase e = do
+--  r <- evalInter e
+--  case r of
+--    Left (FVar x, Branch as : cs) -> do
+----       traceExpr' (FVar x, Branch as : cs)
+--       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+--       xs <- fvars x vs
+--       free . at x ?= (cid, xs)
+--       evalBase (Con cid (map FVar xs), Branch as : cs)
+--    Right (Lam v e, []) -> do
+--      x <- newFVar
+--      evalBase (Lam v e, [Apply . atom . FVar $ x])
+--    Right (Con cid vs, []) -> return $ Con cid vs
+--    o -> error (show o)
+--
+evalInter :: Monad m => Expr' -> ReachT m Susp
 evalInter (e, cs) = do
   c <- fix reduce e cs
   case c of
-    (LVar v, cs') -> return (Left (LVar v, cs'))
-    (FVar x, cs') -> do 
+    SuspL v cs' -> return $ SuspL v cs'
+    Susp x cs' -> do 
       i <- interweaver cs' 
       case i of
-        Left cs'' -> return . Left $ (FVar x, cs'')
---        Right ((cid, as), cs'', ss) -> do
---          let es = fmap (Expr (FVar x) . return . Branch) (transposeSemiAtom as)
---          xs <- evars es 
---          s <- get
---          trace (printDoc (printState (Expr e cs) s)) (return . Right $ (Con cid (map EVar xs), (x, cs'') : ss))
-    (Con c es, []) -> return $ Right (Con c es, [])
-    (Lam x e, []) -> return $ Right (Lam x e, [])
+        Left cs'' -> return $ Susp x cs''
+        Right ((cid, as), cs'') -> do
+          let es = fmap (Expr (FVar x) . return . Branch) (transposeSemiAtom as)
+          xs <- evars es 
+--          traceExpr' (Con cid (map EVar xs), cs'')
+          evalInter (Con cid (map EVar xs), cs'')
+    Fin a -> return $ Fin a
 
 
-addCont :: Conts -> Either [Conts] (SemiAtom, [Conts], [Susp]) ->
-                     Either [Conts] (SemiAtom, [Conts], [Susp]) 
-addCont c (Left cs) = Left (c : cs)
-addCont c (Right (e, cs', es)) = Right (e, cs', es)
-
+--addCont :: Conts -> Either [Conts] (SemiAtom, [Conts], [Conts], [Susp]) ->
+--                     Either [Conts] (SemiAtom, [Conts], [Conts], [Susp]) 
+--addCont c (Left cs) = Left (c : cs)
+--addCont c (Right (e, cs, cs', es)) = Right (e, cs, c : cs', es)
+--
 type SemiAtom = (CId, [Alt [Atom]])
 
 transposeSemiAtom :: [Alt [Atom]] -> [[Alt Expr]]
 transposeSemiAtom = transpose . map (fmap (fmap (flip Expr [])) . sequence)
        
 
-interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] (SemiAtom, [Conts], [Susp]))
-interweaver [] = return (Left [])
-interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
-interweaver (Branch as : cs) = do
-  i <- interweave as  
-  case i of 
-    Left as' -> addCont (Branch as') <$> interweaver cs
---    Right (e, es) -> return (Right (e, cs , es))
-
-interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] (SemiAtom, [Susp]))
-interweave as = do
-  as' <- (mapM . mapM) (bindLets >=> evalInter) as
-  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
+interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] (SemiAtom, [Conts]))
+interweaver = undefined
+--interweaver [] = return (Left [])
+--interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
+--interweaver (Branch as : cs) = do --addCont (Branch as) <$> interweaver cs
+--  i <- interweave as  
+--  case i of 
+--    Left as' -> addCont (Branch as') <$> interweaver cs
+--    Right (e, es) -> return (Right (e, cs, [] , es))
+--
+--interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] (SemiAtom, [Susp]))
+--interweave as = do
+--  as' <- (mapM . mapM) (bindLets >=> evalInter) as
+----  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
 --  case consol' as' of 
 --    Left as'' -> return (Left as'')
---    Right as'' -> trace "blah" $ case consolidate as'' of
---      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
---      Just e -> trace "blah2" $ return . Right $ e
-  
-consol' :: [Alt (Either Expr' (Atom, [Susp]))] -> Either [Alt Expr] [Alt (Atom, [Susp])]
-consol' [] = Right []
-consol' (Alt cid vs e : as) = case consol' as of
-  Left as -> Left (Alt cid vs (either (uncurry Expr) (flip Expr [] . fst) e) : as)
-  Right as -> case e of
-    Left e -> Left (Alt cid vs (uncurry Expr e) : (fmap . fmap) (flip Expr [] . fst) as)
-    Right e -> Right (Alt cid vs e : as)
+--    Right as'' -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
+--
+----      case consolidate as'' of
+----      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
+----      Just e -> trace (show e) return . Right $ e
+--  
+--consol' :: [Alt (Either Expr' (Atom, [Susp]))] -> Either [Alt Expr] [Alt (Atom, [Susp])]
+--consol' [] = Right []
+--consol' (Alt cid vs e : as) = case consol' as of
+--  Left as -> Left (Alt cid vs (either (uncurry Expr) (flip Expr [] . fst) e) : as)
+--  Right as -> case e of
+--    Left e -> Left (Alt cid vs (uncurry Expr e) : (fmap . fmap) (flip Expr [] . fst) as)
+--    Right e -> Right (Alt cid vs e : as)
+--
+--
+--consolidate :: [Alt (Atom, [Susp])] -> Maybe (SemiAtom, [Susp])
+--consolidate [Alt c vs (Con cid es, s)] = Just ((cid, [Alt c vs es]), s) 
+--consolidate (Alt c vs (Con cid es, s) : as) = do
+--   ((cid', ars), s') <- consolidate as
+--   if cid' == cid
+--     then return ((cid', Alt c vs es : ars), s ++ s')
+--     else Nothing
+--
+--           
+--reduceTrace :: Monad m => Reduce m -> Reduce m
+--reduceTrace r e cs = do
+--  s <- get
+--  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
-
-consolidate :: [Alt (Atom, [Susp])] -> Maybe (SemiAtom, [Susp])
-consolidate [Alt c vs (Con cid es, s)] = Just ((cid, [Alt c vs es]), s) 
-consolidate (Alt c vs (Con cid es, s) : as) = do
-   ((cid', ars), s') <- consolidate as
-   if cid' == cid
-     then return ((cid', Alt c vs es : ars), s ++ s')
-     else Nothing
-
-           
-reduceTrace :: Monad m => Reduce m -> Reduce m
-reduceTrace r e cs = do
+traceExpr' :: Monad m => Expr' -> ReachT m Expr'   
+traceExpr' (e , cs) = do
   s <- get
-  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
+  trace (printDoc (printState (Expr e cs) s)) $ return (e,cs) 
 
 bindLets :: Monad m => Expr -> ReachT m Expr'
 bindLets (Let x e e') = do
@@ -126,8 +139,8 @@ bindLets (Let x e e') = do
 bindLets (Expr a cs) = return (a, cs)
   
 reduce :: Monad m => Reduce m -> Reduce m
-reduce r (Lam x e)    [] = return (Lam x e, [])
-reduce r (Con cid es) [] = return (Con cid es, [])
+reduce r (Lam x e)    [] = return . Fin $ Lam x e
+reduce r (Con cid es) [] = return . Fin $ Con cid es
 reduce r (Lam x e') (Apply (Expr a []) : cs) = do
   e'' <- replaceLVar x a e'
   (e , cs') <- bindLets e''
@@ -142,18 +155,25 @@ reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemente
 reduce r (Fun fid) cs = do
   Expr e cs' <- use (funcs . at' fid . body) 
   r e (cs' ++ cs) 
-reduce r (EVar x) cs = do
-  (e , cs') <- use (env . at' x) >>= bindLets
-  (e' , cs'') <- r e cs'
-  env . at x ?= Expr e' cs''
-  -- TODO The behaviour here loses sharing..
-  r e' (cs'' ++ cs)
+reduce r (EVar ev) cs = do
+  (e , cs') <- use (env . at' ev) >>= bindLets
+  s <- r e cs'
+  case s of
+    Susp x cs'' -> do
+      env . at ev ?= Expr (FVar x) cs''
+      return (Susp x (cs'' ++ cs))
+    SuspL v cs'' -> do
+      env . at ev ?= Expr (LVar v) cs''
+      return (SuspL v (cs'' ++ cs))
+    Fin a -> do
+      env . at ev ?= Expr a [] 
+      r a cs
 reduce r (FVar x) cs = do
   c <- use (free . at x)
   case c of
     Just (cid, fids) -> r (Con cid (map FVar fids)) cs
-    Nothing -> return (FVar x, cs)
-reduce r (LVar x) cs = return (LVar x, cs)
+    Nothing -> return $ Susp x cs
+reduce r (LVar x) cs = return (SuspL x cs)
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
@@ -171,9 +191,7 @@ binds _ _ _ = error "Constructor / Alterenative variable mismatch"
 -- variable x is replaced with ex in e'. Then ex is bound to e in the environment.
 bind :: Monad m => LId -> Expr -> Expr -> ReachT m Expr 
 bind x e c = do
-  ex <- use nextEVar
-  nextEVar += 1
-  env . at ex ?= e
+  ex <- evar e
   replaceLVar x (EVar ex) c
 
 evar :: Monad m => Expr -> ReachT m EId
@@ -193,8 +211,8 @@ replaceLVars (v : vs) (e : es) e' = replaceLVar v e e' >>= replaceLVars vs es
 replaceLVar :: Monad m => LId -> Atom -> Expr -> ReachT m Expr
 replaceLVar v a (Let x e e')
   | x == v    = return $ Let x e e'
-  | otherwise = Let x <$> (replaceLVar v a e) <*> (replaceLVar v a e')
-replaceLVar v a (Expr e cs) = Expr <$> (replaceAtom v a e) <*> (mapM replaceConts cs)
+  | otherwise = Let x <$> replaceLVar v a e <*> replaceLVar v a e'
+replaceLVar v a (Expr e cs) = Expr <$> replaceAtom v a e <*> mapM replaceConts cs
    where
      replaceConts (Apply e) = Apply <$> replaceLVar v a e
      replaceConts (Branch as) = Branch <$> mapM replaceAlt as
@@ -215,9 +233,9 @@ replaceAtom v a (LVar v')
   | otherwise = return $ LVar v' 
 replaceAtom v a (Lam x e)
   | v == x    = return $ Lam x e
-  | otherwise = Lam x <$> (replaceLVar v a e)
+  | otherwise = Lam x <$> replaceLVar v a e
 replaceAtom v a (FVar x) = return $ FVar x
-replaceAtom v a (Con c as) = Con c <$> (mapM (replaceAtom v a) as)
+replaceAtom v a (Con c as) = Con c <$> mapM (replaceAtom v a) as
 
 newFVars :: Monad m => Int -> ReachT m [FId]
 newFVars n = replicateM n newFVar
@@ -226,7 +244,7 @@ newFVar :: Monad m => ReachT m FId
 newFVar = do
   x <- use nextFVar
   nextFVar += 1
-  freeDepth . at x ?= 0
+  freeDepth . at x ?= 1
   topFrees %= (x :)
   return x
 

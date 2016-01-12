@@ -11,23 +11,38 @@ import Reach.Printer
 import Control.Monad.Except
 
 import Data.Either       
+import Data.Maybe
 
 import System.Environment
 import System.Console.GetOpt
 import System.IO.Error
 
+data EvalTypes = EvalInterweave       
+               | EvalBasic
+
 data Flag 
   = DataBound Int
+  | EvalType EvalTypes
+  | NoOutput
 
 options :: [OptDescr Flag]
 options =
   [ Option ['d'] [] (ReqArg dbound "NUM")
-      "data-depth bound"
+      "data-depth bound",
+    Option ['e'] ["eval"] (ReqArg evalType "STRING")
+      "Evaluation type I/B for Interweaving/Basic",
+    Option [] ["NO","nooutput"] (NoArg NoOutput)
+      "No output"
   ]
   where dbound s 
           | n >= 0 = DataBound n
           | otherwise = error "DataDepth Bound must be positive"
           where n = read s
+        evalType "I" = EvalType EvalInterweave 
+        evalType "B" = EvalType EvalBasic 
+        evalType "Interweaving" = EvalType EvalInterweave 
+        evalType "Basic" = EvalType EvalBasic 
+        evalType _ = error "unrecognised evaluation type"
 
 main :: IO ()
 main = do
@@ -50,12 +65,20 @@ go fn flags = do
   ms <- mapM (readFile >=> P.parseModule) fns
   m' <- P.mergeModules m ms
   P.checkModule m'
-  let env = C.convModule 4 m'
+  let env = C.convModule dataBound m'
       fid = env ^. funcIds .at' "reach"
       Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
       fal = env ^. constrIds . at' "False"
-  let rs = runF fid env
-  printResults (take 100 .  rights $ rs)
+      rs = runReach (evalStrat (Fun fid, [])) env
+  when output (printResults (rights rs))
+  print (length . rights $ rs)
+    where
+      dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
+      evalStrat = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
+        EvalInterweave -> undefined -- evalBase
+        EvalBasic -> evalLazy
+      output = null [() | NoOutput <- flags]
+--  printResults (length . rights $ rs)
   -- filter (\(Con cid _, _) -> cid == fal) .
 
 
@@ -66,11 +89,7 @@ printFVars :: [Int] -> Env -> IO ()
 printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
 runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
-runF fid env = runReach
-                 (do
-                    evalBase (Fun fid, [])
-                 )
-                 env
+runF fid env = runReach (evalLazy (Fun fid, [])) env
 
 
 --runF :: FId -> Env -> [(Expr, Env)]
