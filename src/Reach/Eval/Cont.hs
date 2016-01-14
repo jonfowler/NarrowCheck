@@ -96,7 +96,7 @@ interweaver (Branch t as : cs) = do --addCont (Branch as) <$> interweaver cs
   i <- interweave as' 
   case i of 
     Left as'' -> addCont (Branch True as'') <$> interweaver cs
---    Right e -> return $ Right (e, cs)
+    Right e -> return $ Right (e, cs)
 
 interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] SemiAtom)
 interweave as = do
@@ -104,11 +104,10 @@ interweave as = do
 --  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
   case consol' as' of 
     Left as'' -> return (Left as'')
-    Right as'' -> return . Left $ (fmap . fmap) (flip Expr []) as''
-
---      case consolidate as'' of
---      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
---      Just e -> trace (show e) return . Right $ e
+    Right as'' -> do --return . Left $ (fmap . fmap) (flip Expr []) as''
+      case consolidate as'' of
+        Nothing -> return . Left $ (fmap . fmap) (flip Expr []) as''
+        Just e -> trace (show e) return . Right $ e
   
 consol' :: [Alt Susp] -> Either [Alt Expr] [Alt Atom]
 consol' [] = Right []
@@ -124,15 +123,15 @@ suspToExpr (SuspL v cs) = Expr (LVar v) cs
 suspToExpr (Susp x cs) = Expr (FVar x) cs
 
 
---consolidate :: [Alt (Atom, [Susp])] -> Maybe (SemiAtom, [Susp])
---consolidate [Alt c vs (Con cid es, s)] = Just ((cid, [Alt c vs es]), s) 
---consolidate (Alt c vs (Con cid es, s) : as) = do
---   ((cid', ars), s') <- consolidate as
---   if cid' == cid
---     then return ((cid', Alt c vs es : ars), s ++ s')
---     else Nothing
---
---           
+consolidate :: [Alt Atom] -> Maybe SemiAtom
+consolidate [Alt c vs (Con cid es)] = Just (cid, [Alt c vs es]) 
+consolidate (Alt c vs (Con cid es) : as) = do
+   (cid', ars) <- consolidate as
+   if cid' == cid
+     then return (cid', Alt c vs es : ars)
+     else Nothing
+
+           
 --reduceTrace :: Monad m => Reduce m -> Reduce m
 --reduceTrace r e cs = do
 --  s <- get
