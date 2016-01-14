@@ -6,6 +6,9 @@ import Control.Lens
 
 import Control.Monad
 
+import Data.IntMap (IntMap)       
+import qualified Data.IntMap as I
+
 type LId = Int 
 type EId = Int
 type CId = Int 
@@ -15,7 +18,7 @@ type FId = Int
 
 data Alt a = Alt !CId [LId] a deriving (Show, Functor, Foldable, Traversable)
 
-data Conts = Branch [Alt Expr]
+data Conts = Branch !Bool [Alt Expr]
            | Apply Expr deriving (Show)
 
 data Expr = Expr Atom [Conts]
@@ -45,6 +48,7 @@ data Atom
   | Con !CId [Atom] deriving Show
 
 
+                            
 closedExpr :: Expr -> Bool
 closedExpr = closedExpr' []
 
@@ -62,7 +66,7 @@ closedAtom vs (Con _ as) = all (closedAtom vs) as
 
 closedConts :: [LId] -> Conts -> Bool
 closedConts vs (Apply e) = closedExpr' vs e
-closedConts vs (Branch as) = all closedAlt as
+closedConts vs (Branch _ as) = all closedAlt as
   where closedAlt (Alt _ vs' e) = closedExpr' (vs' ++ vs) e
 
 atom :: Atom -> Expr

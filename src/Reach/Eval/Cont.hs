@@ -8,6 +8,8 @@ import Reach.Lens
 import Reach.Printer
 import Debug.Trace
 import Data.List
+import Data.IntMap (IntMap)
+import qualified Data.IntMap as I
 
 runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
 runReach m s = runExceptT (runStateT m s)
@@ -28,32 +30,33 @@ evalLazy (e, conts) = do
         x <- newFVar
         evalLazy (Lam v e, [Apply . atom . FVar $ x])
      Fin a -> return a
-     Susp x (Branch as : cs) -> do
+     Susp x (Branch _ as : cs) -> do
        (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
        xs <- fvars x vs
        free . at x ?= (cid, xs)
-       evalLazy (Con cid (map FVar xs), (Branch as : cs))
+       evalLazy (Con cid (map FVar xs), Branch True as : cs)
      SuspL v _ -> error "Should not be suspended on local variable in evalLazy"
 
 choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
 choose _ = foldr ((<|>) . return) memp 
 
---evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
---evalBase e = do
---  r <- evalInter e
---  case r of
---    Left (FVar x, Branch as : cs) -> do
-----       traceExpr' (FVar x, Branch as : cs)
---       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
---       xs <- fvars x vs
---       free . at x ?= (cid, xs)
---       evalBase (Con cid (map FVar xs), Branch as : cs)
---    Right (Lam v e, []) -> do
---      x <- newFVar
---      evalBase (Lam v e, [Apply . atom . FVar $ x])
---    Right (Con cid vs, []) -> return $ Con cid vs
---    o -> error (show o)
---
+evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
+evalBase e = do
+  r <- evalInter e
+  case r of
+    Fin (Lam v e) -> do
+      x <- newFVar
+      evalBase (Lam v e, [Apply . atom . FVar $ x])
+    Fin a -> return a
+    Susp x (Branch _ as : cs) -> do
+--       traceExpr' (FVar x, Branch as : cs)
+       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+       xs <- fvars x vs
+       free . at x ?= (cid, xs)
+       evalBase (Con cid (map FVar xs), Branch True as : cs)
+--        Right (Con cid vs, []) -> return $ Con cid vs
+    o -> error (show o)
+
 evalInter :: Monad m => Expr' -> ReachT m Susp
 evalInter (e, cs) = do
   c <- fix reduce e cs
@@ -63,56 +66,64 @@ evalInter (e, cs) = do
       i <- interweaver cs' 
       case i of
         Left cs'' -> return $ Susp x cs''
-        Right ((cid, as), cs'') -> do
-          let es = fmap (Expr (FVar x) . return . Branch) (transposeSemiAtom as)
-          xs <- evars es 
+--        Right ((cid, as), cs'') -> do
+--          let es = fmap (Expr (FVar x) . return . Branch True) (transposeSemiAtom as)
+--          xs <- evars es 
 --          traceExpr' (Con cid (map EVar xs), cs'')
-          evalInter (Con cid (map EVar xs), cs'')
+--          evalInter (Con cid (map EVar xs), cs'')
     Fin a -> return $ Fin a
 
 
---addCont :: Conts -> Either [Conts] (SemiAtom, [Conts], [Conts], [Susp]) ->
---                     Either [Conts] (SemiAtom, [Conts], [Conts], [Susp]) 
---addCont c (Left cs) = Left (c : cs)
---addCont c (Right (e, cs, cs', es)) = Right (e, cs, c : cs', es)
---
+addCont :: Conts -> Either [Conts] (SemiAtom, [Conts]) ->
+                     Either [Conts] (SemiAtom, [Conts]) 
+addCont c (Left cs) = Left (c : cs)
+addCont c (Right (e, cs)) = Right (e, cs)
+
 type SemiAtom = (CId, [Alt [Atom]])
 
 transposeSemiAtom :: [Alt [Atom]] -> [[Alt Expr]]
 transposeSemiAtom = transpose . map (fmap (fmap (flip Expr [])) . sequence)
        
 
+lalt :: Monad m => Alt Expr -> ReachT m (Alt Expr)
+lalt (Alt cid vs e) = uncurry (Alt cid) <$> lbinds vs e
+
 interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] (SemiAtom, [Conts]))
-interweaver = undefined
---interweaver [] = return (Left [])
---interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
---interweaver (Branch as : cs) = do --addCont (Branch as) <$> interweaver cs
---  i <- interweave as  
---  case i of 
---    Left as' -> addCont (Branch as') <$> interweaver cs
---    Right (e, es) -> return (Right (e, cs, [] , es))
---
---interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] (SemiAtom, [Susp]))
---interweave as = do
---  as' <- (mapM . mapM) (bindLets >=> evalInter) as
-----  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
---  case consol' as' of 
---    Left as'' -> return (Left as'')
---    Right as'' -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
---
-----      case consolidate as'' of
-----      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
-----      Just e -> trace (show e) return . Right $ e
---  
---consol' :: [Alt (Either Expr' (Atom, [Susp]))] -> Either [Alt Expr] [Alt (Atom, [Susp])]
---consol' [] = Right []
---consol' (Alt cid vs e : as) = case consol' as of
---  Left as -> Left (Alt cid vs (either (uncurry Expr) (flip Expr [] . fst) e) : as)
---  Right as -> case e of
---    Left e -> Left (Alt cid vs (uncurry Expr e) : (fmap . fmap) (flip Expr [] . fst) as)
---    Right e -> Right (Alt cid vs e : as)
---
---
+interweaver [] = return (Left [])
+interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
+interweaver (Branch t as : cs) = do --addCont (Branch as) <$> interweaver cs
+  as' <- if t then return as else mapM lalt as
+  i <- interweave as' 
+  case i of 
+    Left as'' -> addCont (Branch True as'') <$> interweaver cs
+--    Right e -> return $ Right (e, cs)
+
+interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] SemiAtom)
+interweave as = do
+  as' <- (mapM . mapM) (bindLets >=> evalInter) as
+--  return (Left ((fmap . fmap) (either (uncurry Expr) (flip Expr [] . fst)) as'))
+  case consol' as' of 
+    Left as'' -> return (Left as'')
+    Right as'' -> return . Left $ (fmap . fmap) (flip Expr []) as''
+
+--      case consolidate as'' of
+--      Nothing -> return . Left $ (fmap . fmap) (flip Expr [] . fst) as''
+--      Just e -> trace (show e) return . Right $ e
+  
+consol' :: [Alt Susp] -> Either [Alt Expr] [Alt Atom]
+consol' [] = Right []
+consol' (Alt cid vs e : as) = case consol' as of
+  Left as -> Left (Alt cid vs (suspToExpr e) : as)
+  Right as -> case e of
+    Fin e -> Right (Alt cid vs e : as)
+    e -> Left (Alt cid vs (suspToExpr e) : (fmap . fmap) (flip Expr []) as)
+
+suspToExpr :: Susp -> Expr
+suspToExpr (Fin a) = Expr a []
+suspToExpr (SuspL v cs) = Expr (LVar v) cs
+suspToExpr (Susp x cs) = Expr (FVar x) cs
+
+
 --consolidate :: [Alt (Atom, [Susp])] -> Maybe (SemiAtom, [Susp])
 --consolidate [Alt c vs (Con cid es, s)] = Just ((cid, [Alt c vs es]), s) 
 --consolidate (Alt c vs (Con cid es, s) : as) = do
@@ -127,28 +138,47 @@ interweaver = undefined
 --  s <- get
 --  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
-traceExpr' :: Monad m => Expr' -> ReachT m Expr'   
-traceExpr' (e , cs) = do
+traceSusp :: Monad m => Susp -> ReachT m Susp
+traceSusp e = do
+  traceExpr (suspToExpr e) >> return e 
+
+
+
+traceExpr :: Monad m => Expr -> ReachT m Expr
+traceExpr e = do
   s <- get
-  trace (printDoc (printState (Expr e cs) s)) $ return (e,cs) 
+  trace (printDoc (printState e s)) $ return e 
 
 bindLets :: Monad m => Expr -> ReachT m Expr'
 bindLets (Let x e e') = do
   e'' <- bind x e e'  
   bindLets e''
 bindLets (Expr a cs) = return (a, cs)
+
+                       
+reduceTrace :: Monad m => Reduce m -> Reduce m
+reduceTrace r e cs = do
+  traceExpr (Expr e cs)
+  reduce r e cs
   
 reduce :: Monad m => Reduce m -> Reduce m
 reduce r (Lam x e)    [] = return . Fin $ Lam x e
 reduce r (Con cid es) [] = return . Fin $ Con cid es
-reduce r (Lam x e') (Apply (Expr a []) : cs) = do
-  e'' <- replaceLVar x a e'
-  (e , cs') <- bindLets e''
-  r e (cs' ++ cs) 
+--reduce r (Lam x e') (Apply (Expr a []) : cs) = do
+--  e'' <- replaceLVar x a e'
+--  (e , cs') <- bindLets e''
+--  r e (cs' ++ cs) 
 reduce r (Lam x e') (Apply e : cs) = do
-  (e'', cs') <- bind x e e' >>= bindLets 
-  r e'' (cs' ++ cs)
-reduce r (Con cid es) (Branch as : cs) = do
+  vs <- scopingExpr e'
+  vs' <- scopeExpr e
+  if null (I.intersection vs vs') 
+    then do
+       (e'', cs') <- bind x e e' >>= bindLets 
+       r e'' (cs' ++ cs)
+    else do
+       traceExpr (Expr (Lam x e') (Apply e : cs) )
+       error "scoping"
+reduce r (Con cid es) (Branch _ as : cs) = do
   (e, cs') <- match cid es as >>= bindLets
   r e (cs' ++ cs)
 reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemented yet"
@@ -156,7 +186,7 @@ reduce r (Fun fid) cs = do
   Expr e cs' <- use (funcs . at' fid . body) 
   r e (cs' ++ cs) 
 reduce r (EVar ev) cs = do
-  (e , cs') <- use (env . at' ev) >>= bindLets
+  (e, cs') <- use (env . at' ev) >>= bindLets
   s <- r e cs'
   case s of
     Susp x cs'' -> do
@@ -173,26 +203,59 @@ reduce r (FVar x) cs = do
   case c of
     Just (cid, fids) -> r (Con cid (map FVar fids)) cs
     Nothing -> return $ Susp x cs
-reduce r (LVar x) cs = return (SuspL x cs)
+reduce r (LVar x) cs = return $ SuspL x cs
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
-  | cid == cid' = replaceLVars xs es c  
+  | cid == cid' = do
+      vs <- scopingExpr c
+      vs' <- I.unions <$> mapM scopeAtom es
+      if null (I.intersection (I.union (I.fromList (zip xs (repeat ()))) vs) vs')
+         then replaceLVars xs es c  
+         else error "scoping"
   | otherwise   = match cid es as
 match _ _ [] = error "REACH_ERROR: no match for constructor in case"
                          
 
 binds :: Monad m => [LId] -> [Expr] -> Expr -> ReachT m Expr 
-binds (x : xs) (e : es) e' = bind x e e' >>= binds xs es
+binds (v : vs) (e : es) e' = bind v e e' >>= binds vs es
 binds [] [] e' = return e'
 binds _ _ _ = error "Constructor / Alterenative variable mismatch"
 
 -- Bind x to e in e', A new environment variable, ex, is created for x and the
 -- variable x is replaced with ex in e'. Then ex is bound to e in the environment.
 bind :: Monad m => LId -> Expr -> Expr -> ReachT m Expr 
-bind x e c = do
-  ex <- evar e
-  replaceLVar x (EVar ex) c
+bind v e c = do
+  ev <- evar e
+  replaceLVar v (EVar ev) c 
+
+lbind :: Monad m => LId -> Expr -> ReachT m (LId, Expr)
+lbind v e = do
+  lv <- lvar
+  e' <- replaceLVar v (LVar lv) e
+  return (lv, e')
+
+
+lbinds :: Monad m => [LId] -> Expr -> ReachT m ([LId], Expr)
+lbinds [] e = return ([], e)
+lbinds (v : vs) e = do
+  (v', e') <- lbind v e
+  (vs',e'') <- lbinds vs e'
+  return (v' : vs', e'')
+
+
+lvar :: Monad m => ReachT m LId  
+lvar = do
+  lv <- use nextLVar
+  nextLVar -= 1
+  return lv
+--ubind :: Monad m => LId -> Expr -> ReachT m Expr 
+--ubind x c = do
+--  ex <- uevar 
+--  replaceLVar x (EVar ex) c
+--
+--ubinds :: Monad m => [LId] -> Expr -> ReachT m Expr 
+--ubinds vs e = foldM (\e' v -> ubind v e') e vs
 
 evar :: Monad m => Expr -> ReachT m EId
 evar e = do
@@ -215,7 +278,7 @@ replaceLVar v a (Let x e e')
 replaceLVar v a (Expr e cs) = Expr <$> replaceAtom v a e <*> mapM replaceConts cs
    where
      replaceConts (Apply e) = Apply <$> replaceLVar v a e
-     replaceConts (Branch as) = Branch <$> mapM replaceAlt as
+     replaceConts (Branch t as) = Branch t <$> mapM replaceAlt as
 
      replaceAlt (Alt c vs e)
        | v `elem` vs  = return $ Alt c vs e
@@ -265,3 +328,47 @@ fvar xo = do
 fvars :: Monad m => FId -> Int -> ReachT m [FId]
 fvars xo n = replicateM n (fvar xo)
 
+
+scopeExpr :: Monad m => Expr -> ReachT m (IntMap ())
+scopeExpr (Let v e e') = I.union <$> scopeExpr e <*> (I.delete v <$> (scopeExpr e'))
+scopeExpr (Expr a cs) =  I.union <$> scopeAtom a
+                                 <*> foldM (\a b -> I.union a <$> (scopeConts b)) I.empty cs
+
+scopeAtom :: Monad m => Atom -> ReachT m (IntMap ())
+scopeAtom (Fun _) = return $ I.empty
+scopeAtom (EVar v) = use  (env . at' v) >>= scopeExpr
+
+scopeAtom (LVar v) = return $ I.singleton v () 
+scopeAtom (FVar _) = return $ I.empty
+scopeAtom (Lam v e) = I.delete v <$> scopeExpr e
+scopeAtom (Con c as) = I.unions <$> mapM scopeAtom as 
+
+scopeConts :: Monad m => Conts -> ReachT m (IntMap ())
+scopeConts (Branch _ as) = I.unions <$> mapM scopeAlt as
+    where scopeAlt (Alt _ vs e) = I.difference
+                                  <$> scopeExpr e
+                                  <*> pure (I.fromList $ zip vs (repeat ())) 
+scopeConts (Apply e) = scopeExpr e 
+
+scopingExpr :: Monad m => Expr -> ReachT m (IntMap ())
+scopingExpr (Let v e e') = I.union
+                           <$> scopingExpr e
+                           <*> (I.insert v () <$> scopingExpr e')
+scopingExpr (Expr a cs) =  I.union <$> scopingAtom a
+                                 <*> foldM (\a b -> I.union a <$> (scopingConts b)) I.empty cs
+
+scopingAtom :: Monad m => Atom -> ReachT m (IntMap ())
+scopingAtom (Fun _) = return $ I.empty
+scopingAtom (EVar v) = use  (env . at' v) >>= scopingExpr
+
+scopingAtom (LVar _) = return $ I.empty
+scopingAtom (FVar _) = return $ I.empty
+scopingAtom (Lam v e) = I.insert v () <$> scopingExpr e
+scopingAtom (Con c as) = I.unions <$> mapM scopingAtom as 
+
+scopingConts :: Monad m => Conts -> ReachT m (IntMap ())
+scopingConts (Branch _ as) = I.unions <$> mapM scopingAlt as
+    where scopingAlt (Alt _ vs e) = I.union 
+                                  <$> scopingExpr e
+                                  <*> pure (I.fromList $ zip vs (repeat ())) 
+scopingConts (Apply e) = scopingExpr e 

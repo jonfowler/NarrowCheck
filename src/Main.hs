@@ -75,7 +75,7 @@ go fn flags = do
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
       evalStrat = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> undefined -- evalBase
+        EvalInterweave -> evalBase -- evalBase
         EvalBasic -> evalLazy
       output = null [() | NoOutput <- flags]
 --  printResults (length . rights $ rs)

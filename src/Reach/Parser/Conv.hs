@@ -29,7 +29,6 @@ data Convert = Convert {
   _convertFuncId :: Conv S.VarId,
   _convertCon :: Conv S.ConId,
   _convertLocals :: Conv S.VarId,
-  _convertCaseLocals :: Conv S.VarId,
   _conInfo :: Map S.ConId Int 
                        }
 
@@ -53,7 +52,6 @@ setupConvert m = Convert
   { _convertFuncId = execState (setupConv (M.keys $ m ^. S.moduleDef)) emptyConv,
     _convertCon = execState (setupConv (M.keys $ m ^. S.moduleCon)) emptyConv,
     _convertLocals = emptyConv,
-    _convertCaseLocals = emptyConv{_nextInt = 1},
     _conInfo = fmap (length . S._conArgs) $ m ^. S.moduleCon 
   }
 
@@ -72,6 +70,7 @@ convModule i m = Env {
 
              _env = I.empty,
              _nextEVar = 0,
+             _nextLVar = -1,
 
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
@@ -112,7 +111,6 @@ atomises es = foldr (\(f , a) (g , as) -> (f . g, a : as)) (id , []) <$> mapM at
  
 convExpr :: S.Expr -> [Conts] -> ConvertM Expr
 convExpr (S.Var vid) cs = Expr <$> (LVar <$> viewConv convertLocals vid) <*> pure cs
-                    <|> Expr <$> (LVar . (0-) <$> viewConv convertCaseLocals vid) <*> pure cs
                     <|> Expr <$> (Fun <$> viewConv convertFuncId vid) <*> pure cs
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
 convExpr (S.ConE cid es) cs = do
@@ -126,15 +124,15 @@ convExpr (S.App f e) cs = do
 convExpr (S.Parens e) cs = convExpr e cs
 convExpr (S.Case e as) cs = do
   as' <- mapM convAlt as
-  convExpr e (Branch as' : cs)
+  convExpr e (Branch False as' : cs)
 
 
 convAlt :: S.Alt -> ConvertM (Alt Expr)
 convAlt (S.Alt (S.Con cid xs)  e) = do
   cs <- viewCons cid
-  vs <- mapM (overConv convertCaseLocals) xs
+  vs <- mapM (overConv convertLocals) xs
   e' <- convExpr e []
-  return (Alt cs (map (0-) vs) e') 
+  return (Alt cs vs e') 
 
 overConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int
 overConv l a = do
