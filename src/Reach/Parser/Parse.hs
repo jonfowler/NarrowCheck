@@ -20,7 +20,6 @@ data Expr = Case Expr [Alt]
           | App Expr Expr
           | Parens Expr
           | ConE ConId [Expr]
-          | ConHole
           | Op Expr OpId Expr
           | Var VarId deriving (Show)
 
