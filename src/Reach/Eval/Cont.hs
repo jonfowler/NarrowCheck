@@ -66,18 +66,19 @@ evalInter (e, cs) = do
       i <- interweaver cs' 
       case i of
         Left cs'' -> return $ Susp x cs''
---        Right ((cid, as), cs'') -> do
---          let es = fmap (Expr (FVar x) . return . Branch True) (transposeSemiAtom as)
---          xs <- evars es 
---          traceExpr' (Con cid (map EVar xs), cs'')
---          evalInter (Con cid (map EVar xs), cs'')
+        Right (bcs, (cid, as), cs'') -> do
+          subj <- evar (Expr (FVar x) bcs)
+          let es = fmap (Expr (EVar subj) . return . Branch True) (transposeSemiAtom as)
+          xs <- evars es 
+--          traceExpr (Expr (Con cid (map EVar xs)) cs'')
+          evalInter (Con cid (map EVar xs), cs'')
     Fin a -> return $ Fin a
 
 
-addCont :: Conts -> Either [Conts] (SemiAtom, [Conts]) ->
-                     Either [Conts] (SemiAtom, [Conts]) 
+addCont :: Conts -> Either [Conts] ([Conts],SemiAtom, [Conts]) ->
+                     Either [Conts] ([Conts],SemiAtom, [Conts]) 
 addCont c (Left cs) = Left (c : cs)
-addCont c (Right (e, cs)) = Right (e, cs)
+addCont c (Right (cs, e, cs')) = Right (c : cs, e, cs')
 
 type SemiAtom = (CId, [Alt [Atom]])
 
@@ -88,7 +89,7 @@ transposeSemiAtom = transpose . map (fmap (fmap (flip Expr [])) . sequence)
 lalt :: Monad m => Alt Expr -> ReachT m (Alt Expr)
 lalt (Alt cid vs e) = uncurry (Alt cid) <$> lbinds vs e
 
-interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] (SemiAtom, [Conts]))
+interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] ([Conts], SemiAtom, [Conts]))
 interweaver [] = return (Left [])
 interweaver (Apply e : cs) = addCont (Apply e) <$> interweaver cs
 interweaver (Branch t as : cs) = do --addCont (Branch as) <$> interweaver cs
@@ -96,7 +97,7 @@ interweaver (Branch t as : cs) = do --addCont (Branch as) <$> interweaver cs
   i <- interweave as' 
   case i of 
     Left as'' -> addCont (Branch True as'') <$> interweaver cs
-    Right e -> return $ Right (e, cs)
+    Right e -> return $ Right ([], e, cs)
 
 interweave :: Monad m => [Alt Expr] -> ReachT m (Either [Alt Expr] SemiAtom)
 interweave as = do
@@ -107,7 +108,7 @@ interweave as = do
     Right as'' -> do --return . Left $ (fmap . fmap) (flip Expr []) as''
       case consolidate as'' of
         Nothing -> return . Left $ (fmap . fmap) (flip Expr []) as''
-        Just e -> trace (show e) return . Right $ e
+        Just e -> return . Right $ e
   
 consol' :: [Alt Susp] -> Either [Alt Expr] [Alt Atom]
 consol' [] = Right []
