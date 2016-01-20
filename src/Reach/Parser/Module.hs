@@ -17,8 +17,11 @@ module Reach.Parser.Module (
 
 import Text.Trifecta.Result
 import Text.Parser.Combinators
+
 import Reach.Parser.Tokens 
 import Reach.Parser.Parse 
+import Reach.Parser.PExpr
+
 import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Map as M
@@ -30,10 +33,10 @@ import Control.Applicative
 data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
-   _moduleData :: Map TypeId Data,
-   _moduleDef :: Map VarId Def,  
+   _moduleData :: Map TypeId PData,
+   _moduleDef :: Map VarId PDef,  
    _moduleTypeDef :: Map VarId TypeDef,
-   _moduleCon :: Map ConId (Con Type)
+   _moduleCon :: Map ConId [Type]
   } deriving (Show)
 makeLenses ''Module
 
@@ -70,7 +73,7 @@ mergeModule' m n | null dataIntersect && null defIntersect
 
 
 
-addData :: Data -> StateT Module (Except String) ()
+addData :: PData -> StateT Module (Except String) ()
 addData d = do
   a <- use (moduleData . at tid)
   case a of
@@ -83,7 +86,7 @@ addImport :: [String] -> StateT Module (Except String) ()
 addImport i = moduleImports %= (i:)
 --      return $ Module (M.insert tid d ds cs) defs tds
 --
-addDef :: Def -> StateT Module (Except String) ()
+addDef :: PDef -> StateT Module (Except String) ()
 addDef d = do
   a <- use (moduleDef . at vid)
   case a of
@@ -99,13 +102,12 @@ addTypeDef d = do
     Nothing -> moduleTypeDef . at vid ?= d
  where vid = d ^. typeDefName
 
-addCon :: Con Type -> StateT Module (Except String) ()
-addCon d = do
+addCon :: (ConId, [Type]) -> StateT Module (Except String) ()
+addCon (cid, ts) = do
   a <- use (moduleCon . at cid)
   case a of
     Just _ -> throwError $ "Constructor " ++ cid ++ " already defined\n"
-    Nothing -> moduleCon . at cid ?= d
- where cid = d ^. conName
+    Nothing -> moduleCon . at cid ?= ts
 
 --td@(TypeDef vid const) (Module ds defs tds) = case M.lookup vid tds of
 --  Just _ -> throwError $ "Variable " ++ varId vid ++ "already has its type defined"
@@ -116,8 +118,8 @@ addCon d = do
 ----addCons :: Cons -> Module -> Except String Module
 ----add
 --
-conToType :: Con Type -> TypeId -> Type
-conToType (Con _ ts) tid = foldr (:->) (Type tid) ts
+conToType :: (ConId, [Type]) -> TypeId -> Type
+conToType (_, ts) tid = foldr (:->) (Type tid) ts
 
 parserOfModule :: Parser (Except String Module)
 parserOfModule = do
@@ -165,7 +167,7 @@ checkTypeDef m td = case M.lookup (td ^. typeDefName) (m ^. moduleDef) of
 
 checkTypeScopes :: Module -> Except String ()
 checkTypeScopes m = do
-  mapMOf_ (moduleData . folded . dataCon . folded . conArgs . folded) (checkTypeScope m) m
+  mapMOf_ (moduleData . folded . dataCon . folded . _2 . folded) (checkTypeScope m) m
   mapMOf_ (moduleTypeDef . folded . typeDefType) (checkTypeScope m) m
 
 --checkTypeScopes :: Module -> Except String Module
@@ -180,19 +182,25 @@ checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
 checkScopes :: Module -> Except String ()
 checkScopes m = mapMOf_ (moduleDef . folded) (checkScopeDef m) m 
 
-checkScopeDef :: Module -> Def -> Except String ()
-checkScopeDef m d = mapM_ (checkLocal m M.empty) (d ^. defArgs) >>
-                    checkScopeExp m (M.fromList (map (\a -> (a,())) $ d ^. defArgs)) (d ^. defBody)
+checkScopeDef :: Module -> PDef -> Except String ()
+checkScopeDef m d = do
+  locals <- foldM (checkPattern m) (M.empty) (d ^. defArgs)
+  checkScopeExp m locals (d ^. defBody)
 
-checkScopeExp :: Module -> Map VarId () -> Expr -> Except String ()
-checkScopeExp m locals (Case e as) = checkScopeExp m locals e <||>
+checkScopeExp :: Module -> Map VarId () -> PExpr -> Except String ()
+checkScopeExp m locals (PCase e as) = checkScopeExp m locals e <||>
    sequence_ (checkScopeAlt m locals <$> as)
-checkScopeExp m locals (App e e') = checkScopeExp m locals e <||> checkScopeExp m locals e'
-checkScopeExp m locals (Parens e) = checkScopeExp m locals e
-checkScopeExp m locals (Var vid) = checkScope m locals vid
-checkScopeExp m locals (Op e v e') = checkScopeExp m locals e <||> checkScope m locals v <||>
+checkScopeExp m locals (PApp e e') = checkScopeExp m locals e <||> checkScopeExp m locals e'
+checkScopeExp m locals (PVar vid) = checkScope m locals vid
+checkScopeExp m locals (PCon cid es) = mapM_ (checkScopeExp m locals) es 
+checkScopeExp m locals (PLam v e) = checkScope m locals v
+                                   <||> checkScopeExp m (M.insert v () locals) e
+
+checkScopeExp m locals (PParens e) = checkScopeExp m locals e
+checkScopeExp m locals (POp e v e') = checkScopeExp m locals e <||> checkScope m locals v <||>
                                      checkScopeExp m locals e'
-checkScopeExp m locals (ConE cid es) = mapM_ (checkScopeExp m locals) es 
+checkScopeExp m locals (POpR v e') = checkScope m locals v <||> checkScopeExp m locals e'
+checkScopeExp m locals (POpL e v) = checkScopeExp m locals e <||> checkScope m locals v
 
 (<||>) :: MonadError e m => m a -> m a -> m ()
 e <||> e' = do
@@ -200,11 +208,14 @@ e <||> e' = do
   e'
   return ()
 
-checkScopeAlt :: Module -> Map VarId () -> Alt -> Except String ()
-checkScopeAlt m locals a = do
-  newlocals <- foldlMOf (altPattern . conArgs . folded)  (checkLocal m) locals a
-  checkScopeExp m newlocals (a ^. altBody)
+checkScopeAlt :: Module -> Map VarId () -> PAlt PExpr -> Except String ()
+checkScopeAlt m locals (PAlt p e) = do
+  newlocals <- checkPattern m locals p 
+  checkScopeExp m newlocals e 
 
+checkPattern :: Module -> Map VarId () -> Pattern -> Except String (Map VarId ())
+checkPattern m locals (PatVar v) = checkLocal m locals v
+checkPattern m locals (PatCon cid ps) = foldM (checkPattern m) locals ps
 
 checkScope :: Module -> Map VarId () -> VarId ->  Except String ()
 checkScope m locals vid = case M.lookup vid (m ^. moduleDef) of

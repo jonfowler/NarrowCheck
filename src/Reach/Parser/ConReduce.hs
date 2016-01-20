@@ -1,4 +1,4 @@
-module Reach.Parser.ConReduce where
+module Reach.Parser.Desugar where
 
 import Reach.Parser.Module
 
