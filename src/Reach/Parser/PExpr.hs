@@ -25,10 +25,13 @@ data PExpr
   | POpR OpId PExpr
   deriving (Show)
      
-data PAlt a = PAlt Pattern a deriving (Show)
+data PAlt a = PAlt Pattern a deriving (Show, Functor)
 
 data Pattern = PatVar VarId
              | PatCon ConId [Pattern] deriving (Show)
+
+getPatCon :: Pattern -> ConId
+getPatCon (PatCon c ps) = c
 
 data PDef = PDef {_defName :: VarId, _defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 makeLenses ''PDef
