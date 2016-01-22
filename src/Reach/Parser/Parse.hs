@@ -13,9 +13,6 @@ import Reach.Parser.PExpr
 
 import Control.Lens
 
-import Debug.Trace
-
-
 --data Con a = Con {_conName :: ConId, _conArgs :: [a]} deriving (Show)
 --makeLenses ''Con
 --
@@ -91,11 +88,12 @@ parseDef = do
 
 parsePattern :: Parser Pattern
 parsePattern = (PatVar <$> parseVarId)
+            <|> (PatCon <$> parseConId <*> pure [])
             <|> between (reserved "(") (res ")") (strictIndent >> parseInnerPattern)
 
 parseInnerPattern :: Parser Pattern
-parseInnerPattern = parsePattern
-                 <|> (PatCon <$> parseConId <*> many (strictIndent >> parsePattern))
+parseInnerPattern = (PatCon <$> parseConId <*> many (strictIndent >> parsePattern))
+                 <|> parsePattern
 
 parseExpr :: Parser PExpr
 parseExpr = ($ id) <$> parseExpr'  

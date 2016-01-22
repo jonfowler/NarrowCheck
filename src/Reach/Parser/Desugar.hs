@@ -9,8 +9,6 @@ import Data.Function
 
 import Reach.Lens
 
-import Debug.Trace
-
 
 {- The following module evaluates the applications of a constructor
 and then atomises the fields of the constructor-}
@@ -129,7 +127,7 @@ matchAlt us d qs = do
   return (PAlt (PatCon c (map PatVar us')) e')
 
   where c = getCon (head qs)
-        i = trace (show qs) $ patCount qs
+        i = patCount qs
 
 depattern :: [PDef] -> PExpr
 depattern ps = flip evalState (VarNum 0) $ do
