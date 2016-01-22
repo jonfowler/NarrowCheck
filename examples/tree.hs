@@ -14,10 +14,9 @@ s3 = S s2
 
 s4 = S s3
 
-all :: (Nat -> Bool) -> Tree ->  Bool
-all p t = case t of
-  Leaf -> True 
-  Node t1 x t2 -> p x && all p t1 && all p t2
+--all :: (Nat -> Bool) -> Tree ->  Bool
+all p (Leaf) = True 
+all p (Node t1 x t2) = p x && all p t1 && all p t2
 
 del n t = case t of
   Leaf -> Leaf

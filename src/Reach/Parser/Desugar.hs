@@ -9,14 +9,17 @@ import Data.Function
 
 import Reach.Lens
 
+import Debug.Trace
+
 
 {- The following module evaluates the applications of a constructor
 and then atomises the fields of the constructor-}
 
- 
+desugar :: [PDef] -> PExpr
+desugar qs = depattern (qs & mapped . defBody %~ partial . deOp)
 
-desugar :: PExpr -> PExpr
-desugar = partial . deOp
+--desugar :: PExpr -> PExpr
+--desugar = partial . deOp
 
 deOp :: PExpr -> PExpr
 deOp e = evalState (deOp' e) 0
@@ -57,12 +60,11 @@ partial (PLet v e e') = PLet v (partial e) (partial e')
 
 
 newtype VarName = VarNum {_varNum :: Int}
-makeLenses ''VarName
 
 newVarName :: State VarName VarId
 newVarName = do
-  i <- use varNum
-  varNum += 1
+  VarNum i <- get
+  put (VarNum $ i + 1)
   return ("#"++show i)
  
 
@@ -83,23 +85,25 @@ subst v e (PLam v' e') | v == v' = PLam v e'
 subst v e (PLet v' e' e'') | v == v' = PLet v e' e''
                           | otherwise = PLet v (subst v e e') (subst v e e'')
 
-type Equat = ([Pattern], PExpr)
-
-isVar :: Equat -> Bool
-isVar ((PatVar v :_),_) = True
+isVar :: PDef -> Bool
+isVar (PDef (PatVar v :_) _) = True
 isVar _ = False
 
-isCon :: Equat -> Bool
-isCon ((PatCon _ _ :_),_) = True
+isCon :: PDef -> Bool
+isCon (PDef (PatCon _ _ :_) _) = True
 isCon _ = False
 
-getCon :: Equat -> ConId
-getCon ((PatCon c _:_),_) = c
+getCon :: PDef -> ConId
+getCon (PDef (PatCon c _:_) _) = c
 
-matcher :: [VarId] -> [Equat] -> PExpr -> State VarName PExpr
+patCount :: [PDef] -> Int
+patCount qs = length ((\(PDef (PatCon _ ps:_) _) -> ps) $ head qs)
+
+matcher :: [VarId] -> [PDef] -> Maybe PExpr -> State VarName (Maybe PExpr)
 matcher [] [] d = return d
-matcher [] (([], e):_) _ = return e
+matcher [] (PDef [] e:_) _ = return $ Just e
 matcher [] _ _ = error "error in function matcher"
+matcher _ [] d = return d
 matcher us qs d | isVar (head qs) = do
                     let (vs, qs') = span isVar qs
                     d' <- matcher us qs' d
@@ -109,24 +113,31 @@ matcher us qs d | isCon (head qs) = do
                     d' <- matcher us qs' d
                     matchCon us (sortBy (compare `on` getCon) cs) d'
 
-matchVar :: [VarId] -> [Equat] -> PExpr -> State VarName PExpr
-matchVar (u:us) qs = matcher us [(ps, subst v (PVar u) e) | (PatVar v : ps, e) <- qs]
+matchVar :: [VarId] -> [PDef] -> Maybe PExpr -> State VarName (Maybe PExpr)
+matchVar (u:us) qs = matcher us [PDef ps (subst v (PVar u) e) | PDef (PatVar v : ps) e <- qs]
 
-matchCon :: [VarId] -> [Equat] -> PExpr -> State VarName PExpr
+matchCon :: [VarId] -> [PDef] -> Maybe PExpr -> State VarName (Maybe PExpr)
 matchCon (u : us) qs d = do
    as <- mapM (matchAlt us d ) (groupBy ((==) `on` getCon) qs)
-   return (PCase (PVar u) (as ++ [defAlt]))
-     where defAlt = PAlt (PatVar "") d 
+   return (Just $ PCase (PVar u) (as ++ defAlt))
+     where defAlt = maybe [] ((:[]) . PAlt (PatVar "")) d 
    
-matchAlt :: [VarId] -> PExpr -> [Equat] -> State VarName (PAlt PExpr)
+matchAlt :: [VarId] -> Maybe PExpr -> [PDef] -> State VarName (PAlt PExpr)
 matchAlt us d qs = do
   us' <- replicateM i newVarName
-  e' <- matcher (us' ++ us) [(ps' ++ ps, e) | (PatCon c ps' : ps, e) <- qs ] d
+  Just e' <- matcher (us' ++ us) [PDef (ps' ++ ps) e | PDef (PatCon c ps' : ps) e <- qs ] d
   return (PAlt (PatCon c (map PatVar us')) e')
 
   where c = getCon (head qs)
-        i = length ((\((PatCon _ ps:_,_)) -> ps) $ head qs)
+        i = trace (show qs) $ patCount qs
 
+depattern :: [PDef] -> PExpr
+depattern ps = flip evalState (VarNum 0) $ do
+  let i = length (_defArgs . head $ ps) 
+  us <- replicateM i newVarName
+  Just e <- matcher us ps Nothing
+  return (foldr (\u f -> PLam u . f) id us e)
+  
 
 --defPattern :: [Pattern] -> PExpr -> PExpr
 --defPattern ps e = do

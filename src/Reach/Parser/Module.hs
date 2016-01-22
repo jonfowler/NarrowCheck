@@ -34,7 +34,7 @@ data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
    _moduleData :: Map TypeId PData,
-   _moduleDef :: Map VarId PDef,  
+   _moduleDef :: Map VarId [PDef],  
    _moduleTypeDef :: Map VarId TypeDef,
    _moduleCon :: Map ConId [Type]
   } deriving (Show)
@@ -86,13 +86,14 @@ addImport :: [String] -> StateT Module (Except String) ()
 addImport i = moduleImports %= (i:)
 --      return $ Module (M.insert tid d ds cs) defs tds
 --
-addDef :: PDef -> StateT Module (Except String) ()
-addDef d = do
-  a <- use (moduleDef . at vid)
-  case a of
-    Just _ -> throwError $ "Variable " ++ vid ++ " already defined\n"
-    Nothing -> moduleDef . at vid ?= d
- where vid = d ^. defName
+addDef :: (VarId, PDef) -> StateT Module (Except String) ()
+addDef (vid, d) = 
+  moduleDef . at vid %= Just . maybe [d] (++ [d])
+--  a <- use (moduleDef . at vid)
+--  case a of
+--    Just _ -> throwError $ "Variable " ++ vid ++ " already defined\n"
+--    Nothing -> 
+-- where vid = d ^. defName
 
 addTypeDef :: TypeDef -> StateT Module (Except String) ()
 addTypeDef d = do
@@ -180,7 +181,7 @@ checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
   Nothing -> throwError $ "Type " ++ tid ++ " not in scope\n"
 
 checkScopes :: Module -> Except String ()
-checkScopes m = mapMOf_ (moduleDef . folded) (checkScopeDef m) m 
+checkScopes m = mapMOf_ (moduleDef . folded . folded) (checkScopeDef m) m 
 
 checkScopeDef :: Module -> PDef -> Except String ()
 checkScopeDef m d = do

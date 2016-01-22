@@ -33,7 +33,9 @@ data Pattern = PatVar VarId
 getPatCon :: Pattern -> ConId
 getPatCon (PatCon c ps) = c
 
-data PDef = PDef {_defName :: VarId, _defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
+
+data PDef = PDef {_defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
+--data PDef = PDef {_defName :: VarId, _defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 makeLenses ''PDef
 
 data Type = Type :-> Type

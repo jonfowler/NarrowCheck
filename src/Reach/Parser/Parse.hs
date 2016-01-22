@@ -66,20 +66,25 @@ parseInnerType = strictIndent >> (between (res "(") (res ")") parseType
 
 
 
-parseDefOp :: Parser (PExpr -> PDef)
+parseDefOp :: Parser (PExpr -> (VarId, PDef))
 parseDefOp = do
   v <- parsePattern 
   strictIndent
   o <- parseOpId 
   strictIndent
   v' <- parsePattern 
-  return (PDef o [v,v'])
-  
+  return (\e -> (o , PDef [v,v'] e))
 
-parseDef :: Parser PDef
+parseDefVar :: Parser (PExpr -> (VarId, PDef))
+parseDefVar = do
+  v <- parseVarId
+  ps <- many (strictIndent >> parsePattern)
+  return (\e -> (v, PDef ps e))
+
+parseDef :: Parser (VarId, PDef)
 parseDef = do
   sameIndent
-  d <- try parseDefOp <|> try (PDef <$> parseVarId <*> (many (strictIndent >> parsePattern)))
+  d <- try parseDefOp <|> try parseDefVar 
   e <-  res "=" *> parseExpr
   return (d e)
 

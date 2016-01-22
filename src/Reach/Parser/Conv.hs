@@ -61,7 +61,7 @@ setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
 convModule :: Int -> Module -> Env
 convModule i m = Env {
-             _funcs = I.fromList $ map (convFun c) (M.elems $ m ^. moduleDef),
+             _funcs = I.fromList $ map (convFun c) (M.toList $ m ^. moduleDef),
 
              _free = I.empty,
              _nextFVar = 0,
@@ -81,15 +81,16 @@ convModule i m = Env {
              }
   where c = setupConvert m
 
-convFun :: Convert -> PDef ->  (FuncId, Func)
-convFun c def = case runExcept . runStateT s $ c of
+convFun :: Convert -> (VarId, [PDef]) -> (FuncId, Func)
+convFun c (vid, qs) = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (
-    fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at (def ^. defName)) ,
+    fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
     Func {_body = e,
           _vars = c' ^. convertLocals . nextInt
           })
- where s = convArgs (map aVar $ def ^. defArgs) <*> convExpr (desugar $ def ^. defBody) []
+ where s = convExpr (desugar qs) []
+         --convArgs (map aVar $ def ^. defArgs) <*> convExpr (desugar $ def ^. defBody) []
 
 aVar :: Pattern -> VarId
 aVar (PatVar x) = x
@@ -125,6 +126,11 @@ convExpr (PCon cid es) cs = do
 convExpr (PApp f e) cs = do
   e' <- convExpr e []
   convExpr f (Apply e' : cs)
+convExpr (PLam v e) cs = do
+  v' <- overConv convertLocals v
+  e' <- convExpr e []
+  return (Expr (Lam v' e') [])
+  
 convExpr (PParens e) cs = convExpr e cs
 convExpr (PCase e as) cs = do
   as' <- mapM convAlt as

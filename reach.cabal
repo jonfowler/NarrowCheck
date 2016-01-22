@@ -51,4 +51,4 @@ executable reach
     Reach.Parser.Module,
     Reach.Parser.Parse,
     Reach.Parser.Tokens
-    Reach.Parser.ConReduce
+    Reach.Parser.Desugar
