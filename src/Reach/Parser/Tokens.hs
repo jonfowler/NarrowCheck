@@ -55,7 +55,7 @@ reservedT = ["case", "of", "data", "import", "let", "in", "module", "where"]
 -- Parse a non reserved lower case word
 notReserved :: Parser String 
 notReserved = do
-  a <- (:) <$> lower <*> many (alphaNum <|> char '_')
+  a <- (:) <$> lower <*> many (alphaNum <|> oneOf "_'")
   if a `elem` reservedT
     then unexpected $ "unexpected reserved word: " ++ a
     else return a

@@ -143,6 +143,8 @@ convAlt (PAlt (PatCon cid xs)  e) = do
   vs <- mapM (overConv convertLocals) (map aVar xs)
   e' <- convExpr e []
   return (Alt cs vs e') 
+convAlt (PAlt (PatVar "") e) = AltDef <$> convExpr e []
+convAlt c = error ("convAlt incomplete patterns: " ++ show c)
 
 overConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int
 overConv l a = do

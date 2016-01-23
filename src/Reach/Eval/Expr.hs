@@ -16,7 +16,8 @@ type FuncId = Int
 type FId = Int
 
 
-data Alt a = Alt !CId [LId] a deriving (Show, Functor, Foldable, Traversable)
+data Alt a = Alt !CId [LId] a
+           | AltDef a deriving (Show, Functor, Foldable, Traversable)
 
 data Conts = Branch !Bool [Alt Expr]
            | Apply Expr deriving (Show)
