@@ -24,6 +24,7 @@ data Flag
   = DataBound Int
   | EvalType EvalTypes
   | NoOutput
+  | Refute
 
 options :: [OptDescr Flag]
 options =
@@ -32,7 +33,9 @@ options =
     Option ['e'] ["eval"] (ReqArg evalType "STRING")
       "Evaluation type I/B for Interweaving/Basic",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
-      "No output"
+      "No output",
+    Option [] ["refute"] (NoArg Refute)
+      "Refute expression"
   ]
   where dbound s 
           | n >= 0 = DataBound n
@@ -69,7 +72,8 @@ go fn flags = do
   --    fid = env ^. funcIds .at' "reach"
       fal = env ^. constrIds . at' "False"
       rs = runReach (evalSetup "reach" >>= evalStrat) env
-  when output (printResults (rights rs))
+  when (output && not refute) (printResults (rights rs))
+  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
   print (length . rights $ rs)
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
@@ -77,6 +81,8 @@ go fn flags = do
         EvalInterweave -> evalBase -- evalBase
         EvalBasic -> evalLazy
       output = null [() | NoOutput <- flags]
+      refute = not (null [() | Refute <- flags])
+
 --  printResults (length . rights $ rs)
   -- filter (\(Con cid _, _) -> cid == fal) .
 

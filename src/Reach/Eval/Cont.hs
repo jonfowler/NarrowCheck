@@ -32,13 +32,14 @@ evalSetup fname = do
       fexpr <- use (funcs . at' fid . body)
       ts <- use (funcArgTypes . at' fid)
       xs <- mapM (fvar 0) ts
+      topFrees .= xs
       (e, cs) <- bindLets fexpr
       return (foldr (\x (e', cs') -> (e, Apply (atom $ FVar x) : cs')) (e, cs) xs)
 
 
 evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
 evalLazy (e, conts) = do
-   c <- fix reduceTrace e conts
+   c <- fix reduce e conts
    case c of 
      Fin (Lam v e) -> do
         x <- newFVar
@@ -63,13 +64,14 @@ choose x = do
   t <- use (freeType . at' x)
   as <- use (typeConstr . at' t)
   (cid, ts) <- mchoice (map pure as)
-  xs <- mapM (fvar d) ts
+  xs <- mapM (fvar (d + 1)) ts
   free . at x ?= (cid, xs)
   return (cid, xs)
 
 fvar :: Monad m => Int -> Type -> ReachT m FId
 fvar d t = do
   x <- use nextFVar
+  nextFVar += 1
   freeDepth . at x ?= d
   freeType . at x ?= t
   return x

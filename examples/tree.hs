@@ -2,6 +2,7 @@ module Tree where
 
 data Tree = Leaf | Node Tree Nat Tree
 
+reach :: Nat -> Tree -> Bool
 reach = prop_ordDel 
 
 --reach x = (s4 <= x) || (s1 <= x)
