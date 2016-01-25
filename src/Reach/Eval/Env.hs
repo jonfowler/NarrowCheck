@@ -1,8 +1,8 @@
 module Reach.Eval.Env (
   Env(..),
-  funcs,
-  free, nextFVar, freeDepth, maxDepth, topFrees,
-  env, nextEVar, nextLVar,
+  funcs, funcArgTypes,
+  free, nextFVar, freeDepth, freeType, maxDepth, topFrees,
+  env, nextEVar, nextLVar, typeConstr,
   funcNames, funcIds, constrNames, constrIds,
   showAtom, printFVar)
   where
@@ -17,16 +17,22 @@ import Reach.Lens
 
 data Env = Env {
   _funcs :: IntMap Func,
+  _funcArgTypes :: IntMap [Type],
 
   _free :: IntMap (CId, [FId]),
   _nextFVar :: !FId,
   _freeDepth :: IntMap Int,
+  _freeType :: IntMap Type,
+
   _maxDepth :: !Int,
   _topFrees :: [FId],
 
   _env :: IntMap Expr,
   _nextEVar :: !EId,
   _nextLVar :: !LId,
+
+  _typeConstr :: IntMap [(CId, [Type])],
+
 
   _funcNames :: IntMap String,
   _funcIds :: Map String FuncId,

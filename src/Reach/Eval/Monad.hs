@@ -3,6 +3,7 @@ module Reach.Eval.Monad (
   module X,
   ReachT,
   ReachFail(..),
+  mchoice,
   MonadChoice(..)
   ) where
 
@@ -27,6 +28,8 @@ class (Monad m) => MonadChoice m where
   infixr 4 <|>
   (<|>) :: m a -> m a -> m a
 
+mchoice :: MonadChoice m => [m a] -> m a
+mchoice = foldr (<|>) memp
 
 instance MonadChoice [] where
   memp = []

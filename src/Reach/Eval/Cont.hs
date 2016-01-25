@@ -6,7 +6,6 @@ import Reach.Eval.Gen
 import Reach.Eval.Env
 import Reach.Lens
 import Reach.Printer
-import Debug.Trace
 import Data.List
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as I
@@ -22,6 +21,16 @@ data Susp = Susp FId [Conts]
           | SuspL LId [Conts]
           | Fin Atom deriving Show
 
+setupEval :: Monad m => String -> ReachT m Expr'
+setupEval fname = do
+  fid <- use (funcIds . at' fname)
+  fexpr <- use (funcs . at' fid . body)
+  ts <- use (funcArgTypes . at' fid)
+  xs <- mapM (fvar 0) ts
+  (e, cs) <- bindLets fexpr
+  return (foldr (\x (e', cs') -> (e, Apply (atom $ FVar x) : cs')) (e, cs) xs)
+
+
 evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
 evalLazy (e, conts) = do
    c <- fix reduce e conts
@@ -31,14 +40,51 @@ evalLazy (e, conts) = do
         evalLazy (Lam v e, [Apply . atom . FVar $ x])
      Fin a -> return a
      Susp x (Branch _ as : cs) -> do
-       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
-       xs <- fvars x vs
-       free . at x ?= (cid, xs)
+--       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+--       xs <- fvars x vs
+--       free . at x ?= (cid, xs)
+       (cid, xs) <- choose x
        evalLazy (Con cid (map FVar xs), Branch True as : cs)
      SuspL v _ -> error "Should not be suspended on local variable in evalLazy"
 
-choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
-choose _ = foldr ((<|>) . return) memp 
+--choose :: MonadChoice m => FId -> [(CId, Int)] -> ReachT m (CId, Int)
+--choose _ = foldr ((<|>) . return) memp 
+
+choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
+choose x = do
+  d <- use (freeDepth . at' x)
+  maxd <- use maxDepth
+  when (maxd <= d) (throwError DataLimitFail)
+  t <- use (freeType . at' x)
+  as <- use (typeConstr . at' t)
+  (cid, ts) <- mchoice (map pure as)
+  xs <- mapM (fvar d) ts
+  free . at x ?= (cid, xs)
+  return (cid, xs)
+
+fvar :: Monad m => Int -> Type -> ReachT m FId
+fvar d t = do
+  x <- use nextFVar
+  freeDepth . at x ?= d
+  freeType . at x ?= t
+  return x
+
+
+--fvars :: Monad m => FId -> (ConId, [Type]) -> ReachT m FId
+--fvars x cid t = do
+
+--  d <- use (freeDepth . at' xo)
+--  maxd <- use maxDepth
+--  if d < maxd 
+--     then do
+--       x <- use nextFVar
+--       nextFVar += 1
+--       freeDepth . at x ?= d + 1
+--       return x
+--     else throwError DataLimitFail
+--
+--fvars :: Monad m => FId -> Int -> ReachT m [FId]
+--fvars xo n = replicateM n (fvar xo)
 
 evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
 evalBase e = do
@@ -50,10 +96,12 @@ evalBase e = do
     Fin a -> return a
     Susp x (Branch _ as : cs) -> do
 --       traceExpr' (FVar x, Branch as : cs)
-       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
-       xs <- fvars x vs
-       free . at x ?= (cid, xs)
+--       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
+--       xs <- fvars x vs
+--       free . at x ?= (cid, xs)
+       (cid, xs) <- choose x
        evalBase (Con cid (map FVar xs), Branch True as : cs)
+--       evalBase (Con cid (map FVar xs), Branch True as : cs)
 --        Right (Con cid vs, []) -> return $ Con cid vs
     o -> error (show o)
 
@@ -88,6 +136,7 @@ transposeSemiAtom = transpose . map (fmap (fmap (flip Expr [])) . sequence)
 
 lalt :: Monad m => Alt Expr -> ReachT m (Alt Expr)
 lalt (Alt cid vs e) = uncurry (Alt cid) <$> lbinds vs e
+lalt (AltDef e) = return $ AltDef e
 
 interweaver :: Monad m => [Conts] -> ReachT m (Either [Conts] ([Conts], SemiAtom, [Conts]))
 interweaver [] = return (Left [])
@@ -112,6 +161,9 @@ interweave as = do
   
 consol' :: [Alt Susp] -> Either [Alt Expr] [Alt Atom]
 consol' [] = Right []
+consol' (AltDef e : _) = case e of
+  Fin e -> Right [AltDef e]
+  e -> Left [AltDef $ suspToExpr e]
 consol' (Alt cid vs e : as) = case consol' as of
   Left as -> Left (Alt cid vs (suspToExpr e) : as)
   Right as -> case e of
@@ -126,28 +178,26 @@ suspToExpr (Susp x cs) = Expr (FVar x) cs
 
 consolidate :: [Alt Atom] -> Maybe SemiAtom
 consolidate [Alt c vs (Con cid es)] = Just (cid, [Alt c vs es]) 
+consolidate [AltDef (Con cid es)] = Just (cid, [AltDef es])
 consolidate (Alt c vs (Con cid es) : as) = do
    (cid', ars) <- consolidate as
    if cid' == cid
      then return (cid', Alt c vs es : ars)
      else Nothing
 
-           
 --reduceTrace :: Monad m => Reduce m -> Reduce m
 --reduceTrace r e cs = do
 --  s <- get
 --  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
-traceSusp :: Monad m => Susp -> ReachT m Susp
-traceSusp e = do
-  traceExpr (suspToExpr e) >> return e 
-
-
-
-traceExpr :: Monad m => Expr -> ReachT m Expr
-traceExpr e = do
-  s <- get
-  trace (printDoc (printState e s)) $ return e 
+--traceSusp :: Monad m => Susp -> ReachT m Susp
+--traceSusp e = do
+--  traceExpr (suspToExpr e) >> return e 
+--
+--traceExpr :: Monad m => Expr -> ReachT m Expr
+--traceExpr e = do
+--  s <- get
+--  trace (printDoc (printState e s)) $ return e 
 
 bindLets :: Monad m => Expr -> ReachT m Expr'
 bindLets (Let x e e') = do
@@ -156,10 +206,10 @@ bindLets (Let x e e') = do
 bindLets (Expr a cs) = return (a, cs)
 
                        
-reduceTrace :: Monad m => Reduce m -> Reduce m
-reduceTrace r e cs = do
-  traceExpr (Expr e cs)
-  reduce r e cs
+--reduceTrace :: Monad m => Reduce m -> Reduce m
+--reduceTrace r e cs = do
+--  traceExpr (Expr e cs)
+--  reduce r e cs
   
 reduce :: Monad m => Reduce m -> Reduce m
 reduce r (Lam x e)    [] = return . Fin $ Lam x e
@@ -169,15 +219,16 @@ reduce r (Con cid es) [] = return . Fin $ Con cid es
 --  (e , cs') <- bindLets e''
 --  r e (cs' ++ cs) 
 reduce r (Lam x e') (Apply e : cs) = do
-  vs <- scopingExpr e'
-  vs' <- scopeExpr e
-  if null (I.intersection vs vs') 
-    then do
-       (e'', cs') <- bind x e e' >>= bindLets 
-       r e'' (cs' ++ cs)
-    else do
-       traceExpr (Expr (Lam x e') (Apply e : cs) )
-       error "scoping"
+  (e'', cs') <- bind x e e' >>= bindLets 
+  r e'' (cs' ++ cs)
+
+--  vs <- scopingExpr e'
+--  vs' <- scopeExpr e
+--  if null (I.intersection vs vs') 
+--    then do
+--    else do
+--       traceExpr (Expr (Lam x e') (Apply e : cs) )
+--       error "scoping"
 reduce r (Con cid es) (Branch _ as : cs) = do
   (e, cs') <- match cid es as >>= bindLets
   r e (cs' ++ cs)
@@ -207,13 +258,14 @@ reduce r (LVar x) cs = return $ SuspL x cs
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
-  | cid == cid' = do
-      vs <- scopingExpr c
-      vs' <- I.unions <$> mapM scopeAtom es
-      if null (I.intersection (I.union (I.fromList (zip xs (repeat ()))) vs) vs')
-         then replaceLVars xs es c  
-         else error "scoping"
+  | cid == cid' = replaceLVars xs es c
+--      vs <- scopingExpr c
+--      vs' <- I.unions <$> mapM scopeAtom es
+--      if null (I.intersection (I.union (I.fromList (zip xs (repeat ()))) vs) vs')
+--         then   
+--         else error "scoping"
   | otherwise   = match cid es as
+match  cid es (AltDef e : _) = return e
 match _ _ [] = error "REACH_ERROR: no match for constructor in case"
                          
 
@@ -283,6 +335,7 @@ replaceLVar v a (Expr e cs) = Expr <$> replaceAtom v a e <*> mapM replaceConts c
      replaceAlt (Alt c vs e)
        | v `elem` vs  = return $ Alt c vs e
        | otherwise    = Alt c vs <$> replaceLVar v a e
+     replaceAlt (AltDef e) = AltDef <$> replaceLVar v a e
 
 replaceAtom :: Monad m => LId -> Atom -> Atom -> ReachT m Atom
 replaceAtom v a (Fun f) = return $ Fun f
@@ -311,23 +364,6 @@ newFVar = do
   topFrees %= (x :)
   return x
 
-fvar :: Monad m => FId -> ReachT m FId
-fvar xo = do
-  x <- use nextFVar
-  nextFVar += 1
-
-  maxd <- use maxDepth
-  d <- use (freeDepth . at' xo)
-
-  if d < maxd 
-     then do
-       freeDepth . at x ?= d + 1
-       return x
-     else throwError DataLimitFail
-
-fvars :: Monad m => FId -> Int -> ReachT m [FId]
-fvars xo n = replicateM n (fvar xo)
-
 
 scopeExpr :: Monad m => Expr -> ReachT m (IntMap ())
 scopeExpr (Let v e e') = I.union <$> scopeExpr e <*> (I.delete v <$> (scopeExpr e'))
@@ -348,6 +384,7 @@ scopeConts (Branch _ as) = I.unions <$> mapM scopeAlt as
     where scopeAlt (Alt _ vs e) = I.difference
                                   <$> scopeExpr e
                                   <*> pure (I.fromList $ zip vs (repeat ())) 
+          scopeAlt (AltDef e) = scopeExpr e
 scopeConts (Apply e) = scopeExpr e 
 
 scopingExpr :: Monad m => Expr -> ReachT m (IntMap ())
@@ -371,4 +408,5 @@ scopingConts (Branch _ as) = I.unions <$> mapM scopingAlt as
     where scopingAlt (Alt _ vs e) = I.union 
                                   <$> scopingExpr e
                                   <*> pure (I.fromList $ zip vs (repeat ())) 
+          scopingAlt (AltDef e) = scopingExpr e
 scopingConts (Apply e) = scopingExpr e 

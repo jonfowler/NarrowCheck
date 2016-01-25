@@ -30,8 +30,8 @@ ins x (T col a y b) = case x < y of
 -- Mistake on 4th line, 3rd line is correct
 balance B (T R (T R a x b) y c) z d = T R (T B a x b) y (T B c z d)
 balance B (T R a x (T R b y c)) z d = T R (T B a x b) y (T B c z d)
---balance B a x (T R (T R b y c) z d) = T R (T B a x b) y (T B c z d)
-balance B a x (T R (T R c y b) z d) = T R (T B a x b) y (T B c z d)
+balance B a x (T R (T R b y c) z d) = T R (T B a x b) y (T B c z d)
+--balance B a x (T R (T R c y b) z d) = T R (T B a x b) y (T B c z d)
 balance B a x (T R b y (T R c z d)) = T R (T B a x b) y (T B c z d)
 balance col a x b = T col a x b
 

@@ -14,6 +14,7 @@ type EId = Int
 type CId = Int 
 type FuncId = Int
 type FId = Int
+type Type = Int
 
 
 data Alt a = Alt !CId [LId] a
