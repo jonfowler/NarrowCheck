@@ -38,11 +38,13 @@ data PDef = PDef {_defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 --data PDef = PDef {_defName :: VarId, _defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 makeLenses ''PDef
 
-data Type = Type :-> Type
+data PType = PType :-> PType
           | Type TypeId deriving (Show)
 
-data PData = PData {_dataName :: TypeId, _dataCon :: [(ConId, [Type])]} deriving (Show)
-makeLenses ''PData
+type PData = (TypeId, [(ConId, [PType])])
+
+  --PData {_dataName :: TypeId, _dataCon :: [(ConId, [PType])]} deriving (Show)
+--makeLenses ''PData
 
 
 

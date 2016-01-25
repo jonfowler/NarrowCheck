@@ -33,10 +33,10 @@ import Control.Applicative
 data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
-   _moduleData :: Map TypeId PData,
+   _moduleData :: Map TypeId [(ConId,[PType])],
    _moduleDef :: Map VarId [PDef],  
-   _moduleTypeDef :: Map VarId TypeDef,
-   _moduleCon :: Map ConId [Type]
+   _moduleTypeDef :: Map VarId PType,
+   _moduleCon :: Map ConId [PType]
   } deriving (Show)
 makeLenses ''Module
 
@@ -74,13 +74,12 @@ mergeModule' m n | null dataIntersect && null defIntersect
 
 
 addData :: PData -> StateT Module (Except String) ()
-addData d = do
+addData (tid, d) = do
   a <- use (moduleData . at tid)
   case a of
     Just _ -> throwError $ "Type "++ tid ++ " already defined\n"
     Nothing -> do moduleData . at tid ?= d
-                  sequence_ (addCon <$> (d ^. dataCon))
- where tid = d ^. dataName
+                  sequence_ (addCon <$> d)
 
 addImport :: [String] -> StateT Module (Except String) ()
 addImport i = moduleImports %= (i:)
@@ -95,15 +94,14 @@ addDef (vid, d) =
 --    Nothing -> 
 -- where vid = d ^. defName
 
-addTypeDef :: TypeDef -> StateT Module (Except String) ()
-addTypeDef d = do
+addTypeDef :: (VarId, PType) -> StateT Module (Except String) ()
+addTypeDef (vid, d) = do
   a <- use (moduleTypeDef . at vid)
   case a of
     Just _ -> throwError $ "Type of variable " ++ vid ++ " already defined\n"
     Nothing -> moduleTypeDef . at vid ?= d
- where vid = d ^. typeDefName
 
-addCon :: (ConId, [Type]) -> StateT Module (Except String) ()
+addCon :: (ConId, [PType]) -> StateT Module (Except String) ()
 addCon (cid, ts) = do
   a <- use (moduleCon . at cid)
   case a of
@@ -119,7 +117,7 @@ addCon (cid, ts) = do
 ----addCons :: Cons -> Module -> Except String Module
 ----add
 --
-conToType :: (ConId, [Type]) -> TypeId -> Type
+conToType :: (ConId, [PType]) -> TypeId -> PType
 conToType (_, ts) tid = foldr (:->) (Type tid) ts
 
 parserOfModule :: Parser (Except String Module)
@@ -159,22 +157,22 @@ checkModule m = case runExcept (checkTypeDefs m >> checkScopes m) of
 
 
 checkTypeDefs :: Module -> Except String ()
-checkTypeDefs m = sequence_ (fmap (checkTypeDef m) (m ^. moduleTypeDef))
+checkTypeDefs m = sequence_ (checkTypeDef m <$> M.keys (m ^. moduleTypeDef))
 
-checkTypeDef :: Module -> TypeDef -> Except String ()
-checkTypeDef m td = case M.lookup (td ^. typeDefName) (m ^. moduleDef) of
-  Nothing -> throwError $ "Type definition for " ++ td ^. typeDefName ++ " has no corresponding definiton\n"
+checkTypeDef :: Module -> VarId -> Except String ()
+checkTypeDef m f = case M.lookup f (m ^. moduleDef) of
+  Nothing -> throwError $ "Type definition for " ++ f ++ " has no corresponding definiton\n"
   Just _ -> return () 
 
 checkTypeScopes :: Module -> Except String ()
 checkTypeScopes m = do
-  mapMOf_ (moduleData . folded . dataCon . folded . _2 . folded) (checkTypeScope m) m
-  mapMOf_ (moduleTypeDef . folded . typeDefType) (checkTypeScope m) m
+  mapMOf_ (moduleData . folded . folded . _2 . folded) (checkTypeScope m) m
+  mapMOf_ (moduleTypeDef . folded) (checkTypeScope m) m
 
 --checkTypeScopes :: Module -> Except String Module
 --checkTypeScopes m = foldM checkTypeScope m (view  <$> m ^. moduleData)
 
-checkTypeScope :: Module -> Type -> Except String ()
+checkTypeScope :: Module -> PType -> Except String ()
 checkTypeScope m (s :-> t) =  checkTypeScope m s >> checkTypeScope m t
 checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
   Just _ -> return () 

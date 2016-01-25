@@ -66,10 +66,9 @@ go fn flags = do
   m' <- P.mergeModules m ms
   P.checkModule m'
   let env = C.convModule dataBound m'
-      fid = env ^. funcIds .at' "reach"
-      Func allfunc _ = env ^. funcs . at' (env ^. funcIds .at' "test")
+  --    fid = env ^. funcIds .at' "reach"
       fal = env ^. constrIds . at' "False"
-      rs = runReach (evalStrat (Fun fid, [])) env
+      rs = runReach (evalSetup "reach" >>= evalStrat) env
   when output (printResults (rights rs))
   print (length . rights $ rs)
     where

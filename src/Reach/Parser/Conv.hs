@@ -30,6 +30,7 @@ data Convert = Convert {
   _convertFuncId :: Conv VarId,
   _convertCon :: Conv ConId,
   _convertLocals :: Conv VarId,
+  _convertTypes :: Conv TypeId,
   _conInfo :: Map ConId Int 
                        }
 
@@ -52,6 +53,7 @@ setupConvert :: Module -> Convert
 setupConvert m = Convert
   { _convertFuncId = execState (setupConv (M.keys $ m ^. moduleDef)) emptyConv,
     _convertCon = execState (setupConv (M.keys $ m ^. moduleCon)) emptyConv,
+    _convertTypes = execState (setupConv (M.keys $ m ^. moduleData)) emptyConv,
     _convertLocals = emptyConv,
     _conInfo = fmap length $ m ^. moduleCon 
   }
@@ -62,10 +64,13 @@ setupConv as = foldM_ (\_ v -> overConv id v) 0 as
 convModule :: Int -> Module -> Env
 convModule i m = Env {
              _funcs = I.fromList $ map (convFun c) (M.toList $ m ^. moduleDef),
+             _funcArgTypes = I.fromList $ map (convFuncArg c) (M.toList $ m ^. moduleTypeDef),
 
              _free = I.empty,
              _nextFVar = 0,
              _freeDepth = I.empty,
+             _freeType = I.empty,
+
              _maxDepth = i,
              _topFrees = [],
 
@@ -76,10 +81,29 @@ convModule i m = Env {
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
 
+             _typeConstr = I.fromList $ map (convData c) (M.toList $ m ^. moduleData),
              _constrNames = c ^. convertCon . mapFromInt,
              _constrIds = c ^. convertCon . mapToInt 
              }
   where c = setupConvert m
+
+convData :: Convert -> (TypeId, [(ConId, [PType])]) -> (Type, [(CId, [Type])])
+convData c (tid, cs) = (c ^. convertTypes . mapToInt . at' tid, map convConType cs)
+   where convConType (cid, ts) = (c ^. convertCon . mapToInt . at' cid,
+                                  map (convType c . simpleType) ts)
+
+convFuncArg :: Convert -> (VarId, PType) -> (FuncId, [Type])
+convFuncArg c (vid, t) = (c ^. convertFuncId . mapToInt .at' vid, map (convType c) (getArgs t))
+
+convType :: Convert -> TypeId -> Type
+convType c tid = c ^. convertTypes . mapToInt . at' tid
+
+simpleType :: PType -> TypeId
+simpleType (Type tid) = tid 
+
+getArgs :: PType -> [TypeId]
+getArgs (Type _) = []
+getArgs (Type tid :-> t) = tid : getArgs t
 
 convFun :: Convert -> (VarId, [PDef]) -> (FuncId, Func)
 convFun c (vid, qs) = case runExcept . runStateT s $ c of

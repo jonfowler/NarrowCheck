@@ -10,6 +10,8 @@ import Data.List
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as I
 
+import Debug.Trace
+
 runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
 runReach m s = runExceptT (runStateT m s)
 
@@ -21,19 +23,22 @@ data Susp = Susp FId [Conts]
           | SuspL LId [Conts]
           | Fin Atom deriving Show
 
-setupEval :: Monad m => String -> ReachT m Expr'
-setupEval fname = do
-  fid <- use (funcIds . at' fname)
-  fexpr <- use (funcs . at' fid . body)
-  ts <- use (funcArgTypes . at' fid)
-  xs <- mapM (fvar 0) ts
-  (e, cs) <- bindLets fexpr
-  return (foldr (\x (e', cs') -> (e, Apply (atom $ FVar x) : cs')) (e, cs) xs)
+evalSetup :: Monad m => String -> ReachT m Expr'
+evalSetup fname = do
+  fid' <- use (funcIds . at fname)
+  case fid' of
+    Nothing -> error "The reach function does not a type"
+    Just fid -> do
+      fexpr <- use (funcs . at' fid . body)
+      ts <- use (funcArgTypes . at' fid)
+      xs <- mapM (fvar 0) ts
+      (e, cs) <- bindLets fexpr
+      return (foldr (\x (e', cs') -> (e, Apply (atom $ FVar x) : cs')) (e, cs) xs)
 
 
 evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
 evalLazy (e, conts) = do
-   c <- fix reduce e conts
+   c <- fix reduceTrace e conts
    case c of 
      Fin (Lam v e) -> do
         x <- newFVar
@@ -185,19 +190,19 @@ consolidate (Alt c vs (Con cid es) : as) = do
      then return (cid', Alt c vs es : ars)
      else Nothing
 
---reduceTrace :: Monad m => Reduce m -> Reduce m
---reduceTrace r e cs = do
---  s <- get
---  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
+reduceTrace :: Monad m => Reduce m -> Reduce m
+reduceTrace r e cs = do
+  s <- get
+  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
---traceSusp :: Monad m => Susp -> ReachT m Susp
---traceSusp e = do
---  traceExpr (suspToExpr e) >> return e 
---
---traceExpr :: Monad m => Expr -> ReachT m Expr
---traceExpr e = do
---  s <- get
---  trace (printDoc (printState e s)) $ return e 
+traceSusp :: Monad m => Susp -> ReachT m Susp
+traceSusp e = do
+  traceExpr (suspToExpr e) >> return e 
+
+traceExpr :: Monad m => Expr -> ReachT m Expr
+traceExpr e = do
+  s <- get
+  trace (printDoc (printState e s)) $ return e 
 
 bindLets :: Monad m => Expr -> ReachT m Expr'
 bindLets (Let x e e') = do

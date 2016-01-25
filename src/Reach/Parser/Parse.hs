@@ -26,11 +26,11 @@ import Control.Lens
 --data Alt = Alt {_altPattern :: Con VarId, _altBody :: Expr} deriving (Show)
 --makeLenses ''Alt
 --
-data TypeDef = TypeDef {_typeDefName :: VarId, _typeDefType :: Type} deriving (Show)
-makeLenses ''TypeDef
+--data TypeDef = TypeDef {_typeDefName :: VarId, _typeDefType :: PType} deriving (Show)
+--makeLenses ''TypeDef
 
 parseData :: Parser PData
-parseData = try (top "data") >> (PData
+parseData = try (top "data") >> (tuple
       <$> (strictIndent >> parseTypeId)
       <*> (res "=" >> sepBy1 (strictIndent >> parseCon parseType) (res "|")))
 
@@ -51,13 +51,13 @@ parseCon p = tuple <$> parseConId <*> many (strictIndent >> p)
 
 tuple a b = (a,b)
       
-parseTypeDef :: Parser TypeDef
-parseTypeDef = sameIndent >> TypeDef <$> parseVarId <* res "::" <*> parseType
+parseTypeDef :: Parser (VarId, PType) 
+parseTypeDef = sameIndent >> tuple <$> parseVarId <* res "::" <*> parseType
 
-parseType :: Parser Type
+parseType :: Parser PType
 parseType = foldr1 (:->) <$> sepBy1 (parseInnerType) (res "->")
 
-parseInnerType :: Parser Type
+parseInnerType :: Parser PType
 parseInnerType = strictIndent >> (between (res "(") (res ")") parseType
                <|> Type <$> parseTypeId)
 
