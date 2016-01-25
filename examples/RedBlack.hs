@@ -87,6 +87,7 @@ redBlack t = ord t && black t && red t
 -- refute
 prop_insertRB x t = (redBlack t ==> redBlack (insert x t))
 
+reach :: Nat -> Tree -> Bool
 reach = prop_insertRB 
 
 
