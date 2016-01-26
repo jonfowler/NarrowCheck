@@ -25,6 +25,7 @@ data Conts = Branch !Bool [Alt Expr]
 
 data Expr = Expr Atom [Conts]
   | Let !LId Expr Expr
+  | LMap !(IntMap Atom) Expr
           deriving Show
 
 data Atom 

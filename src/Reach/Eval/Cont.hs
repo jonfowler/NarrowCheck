@@ -7,6 +7,7 @@ import Reach.Eval.Env
 import Reach.Lens
 import Reach.Printer
 import Data.List
+
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as I
 
@@ -210,8 +211,28 @@ bindLets :: Monad m => Expr -> ReachT m Expr'
 bindLets (Let x e e') = do
   e'' <- bind x e e'  
   bindLets e''
+bindLets (LMap f e) = bindLocals f e
 bindLets (Expr a cs) = return (a, cs)
 
+bindLocals :: Monad m => IntMap Atom -> Expr -> ReachT m Expr'
+bindLocals f (LMap g e) = do
+--  fg <- sequence $ I.unionWith (\a _ -> a >>= substAtom g) (fmap return f) (fmap return g)
+  let fg = I.unionWith (\a _ -> error "bindLocals.. overwrite") f g
+  bindLocals fg e
+bindLocals f (Let x e e') = do
+  ev <- evar
+  env . at ev ?= LMap f e
+
+  bindLocals ( ) e'
+bindLocals f (Expr a cs) = do
+  a' <- substAtom 
+
+
+--  bindLet x (LMap f e)
+
+
+substAtom :: (IntMap Atom) -> Atom -> ReachT m Atom
+substAtom = undefined
                        
 --reduceTrace :: Monad m => Reduce m -> Reduce m
 --reduceTrace r e cs = do
