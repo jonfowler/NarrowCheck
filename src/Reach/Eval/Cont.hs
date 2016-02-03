@@ -76,23 +76,6 @@ fvar d t = do
   freeType . at x ?= t
   return x
 
-
---fvars :: Monad m => FId -> (ConId, [Type]) -> ReachT m FId
---fvars x cid t = do
-
---  d <- use (freeDepth . at' xo)
---  maxd <- use maxDepth
---  if d < maxd 
---     then do
---       x <- use nextFVar
---       nextFVar += 1
---       freeDepth . at x ?= d + 1
---       return x
---     else throwError DataLimitFail
---
---fvars :: Monad m => FId -> Int -> ReachT m [FId]
---fvars xo n = replicateM n (fvar xo)
-
 evalBase :: MonadChoice m => Expr' -> ReachT m Atom 
 evalBase e = do
   r <- evalInter e
@@ -102,14 +85,8 @@ evalBase e = do
       evalBase (Lam v e, [Apply . atom . FVar $ x])
     Fin a -> return a
     Susp x (Branch as : cs) -> do
---       traceExpr' (FVar x, Branch as : cs)
---       (cid,vs) <- choose x (map (\(Alt c vs e) -> (c,length vs)) as)
---       xs <- fvars x vs
---       free . at x ?= (cid, xs)
        (cid, xs) <- choose x
        evalBase (Con cid (map FVar xs), Branch as : cs)
---       evalBase (Con cid (map FVar xs), Branch True as : cs)
---        Right (Con cid vs, []) -> return $ Con cid vs
     o -> error (show o)
 
 evalInter :: Monad m => Expr' -> ReachT m Susp
@@ -144,7 +121,7 @@ inlineFunc :: Monad m => Func -> ReachT m Expr
 inlineFunc (Func e vs) = do 
   i <- use nextEVar
   nextEVar += vs
-  return (e i) 
+  return (replaceExpr i e) 
 
 --lalt :: Monad m => Alt Expr -> ReachT m (Alt Expr)
 --lalt (Alt cid vs e) = uncurry (Alt cid) <$> lbinds vs e
@@ -280,6 +257,7 @@ match  cid es (Alt cid' xs c : as)
   | otherwise   = match cid es as
 match  cid es (AltDef e : _) = return e
 match _ _ [] = error "REACH_ERROR: no match for constructor in case"
+
                          
 
 binds :: Monad m => [LId] -> [Expr] -> ReachT m ()
@@ -335,30 +313,6 @@ evars = mapM evar
 --replaceLVars [] [] e = return e
 --replaceLVars (v : vs) (e : es) e' = replaceLVar v e e' >>= replaceLVars vs es
 
-replaceLVar :: Int -> Expr -> Expr
-replaceLVar v (Let x e e') = Let (x + v) (replaceLVar v e) (replaceLVar v e')
-replaceLVar v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
-   where
-     replaceConts (Apply e) = Apply (replaceLVar v e)
-     replaceConts (Branch as) = Branch (map replaceAlt as)
-
-     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceLVar v e)
-     replaceAlt (AltDef e) = AltDef (replaceLVar v e)
-
-replaceAtom :: Int -> Atom -> Atom
-replaceAtom v (Fun f) = Fun f
-replaceAtom v (Var x) = Var (v + x)
---  e <- use (env . at' x)
---  e' <- replaceLVar v a e
---  env . at x ?= e'
---  return $ Var x
---replaceAtom v a (LVar v')
---  | v == v'   = return a 
---  | otherwise = return $ LVar v' 
-replaceAtom v (Lam x e) = Lam (v + x) (replaceLVar v e)
-replaceAtom v (FVar x) = FVar x
-replaceAtom v (Con c as) = Con c (map (replaceAtom v) as)
-
 newFVars :: Monad m => Int -> ReachT m [FId]
 newFVars n = replicateM n newFVar
 
@@ -370,6 +324,22 @@ newFVar = do
   topFrees %= (x :)
   return x
 
+replaceExpr :: Int -> Expr -> Expr
+replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
+replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
+   where
+     replaceConts (Apply e) = Apply (replaceExpr v e)
+     replaceConts (Branch as) = Branch (map replaceAlt as)
+
+     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
+     replaceAlt (AltDef e) = AltDef (replaceExpr v e)
+
+replaceAtom :: Int -> Atom -> Atom
+replaceAtom v (Fun f) = Fun f
+replaceAtom v (Var x) = Var (v + x)
+replaceAtom v (Lam x e) = Lam (v + x) (replaceExpr v e)
+replaceAtom v (FVar x) = FVar x
+replaceAtom v (Con c as) = Con c (map (replaceAtom v) as)
 
 --scopeExpr :: Monad m => Expr -> ReachT m (IntMap ())
 --scopeExpr (Let v e e') = I.union <$> scopeExpr e <*> (I.delete v <$> (scopeExpr e'))

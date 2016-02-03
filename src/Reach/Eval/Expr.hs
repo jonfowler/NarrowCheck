@@ -84,7 +84,7 @@ atom a = Expr a []
 -- Atoms are nested constructors with variables at their leaves.
 
 data Func =
-  Func {_body :: Int -> Expr,
+  Func {_body :: Expr,
         _vars :: !Int
        } -- deriving Show
 

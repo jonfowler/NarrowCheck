@@ -110,35 +110,13 @@ convFunc c (vid, qs) = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (
     fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
-    Func {_body = functionExpr e,
+    Func {_body = e,
           _vars = c' ^. convertLocals . nextInt
           })
  where s = convExpr (desugar qs) []
-         --convArgs (map aVar $ def ^. defArgs) <*> convExpr (desugar $ def ^. defBody) []
 
 aVar :: Pattern -> VarId
 aVar (PatVar x) = x
-
-functionExpr :: Expr -> (Int -> Expr)
-functionExpr = flip replaceExpr
-
-replaceExpr :: Int -> Expr -> Expr
-replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
-replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
-   where
-     replaceConts (Apply e) = Apply (replaceExpr v e)
-     replaceConts (Branch as) = Branch (map replaceAlt as)
-
-     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
-     replaceAlt (AltDef e) = AltDef (replaceExpr v e)
-
-replaceAtom :: Int -> Atom -> Atom
-replaceAtom v (Fun f) = Fun f
-replaceAtom v (Var x) = Var (v + x)
-replaceAtom v (Lam x e) = Lam (v + x) (replaceExpr v e)
-replaceAtom v (FVar x) = FVar x
-replaceAtom v (Con c as) = Con c (map (replaceAtom v) as)
-
 
 convArgs :: [VarId] -> ConvertM (Expr -> Expr)
 convArgs [] = return id
