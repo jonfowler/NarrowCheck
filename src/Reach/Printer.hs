@@ -58,7 +58,6 @@ printExpr' s (Let v e e') = (text "let" <+> var "v" v
                                         <+> printExpr s e'
                             , True)
 printExpr' s (Expr e cs) = printConts s (printAtom' s e) cs
-printExpr' s (LMap f e) = (text "LMAP" <+> printExpr s e, True)
 
 printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
 printConts s d [] = d

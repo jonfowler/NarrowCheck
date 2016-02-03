@@ -7,7 +7,6 @@ import Reach.Eval.Env
 import Reach.Lens
 import Reach.Printer
 import Data.List
-
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as I
 
@@ -40,7 +39,7 @@ evalSetup fname = do
 
 evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
 evalLazy (e, conts) = do
-   c <- fix reduceTrace e conts
+   c <- fix reduce e conts
    case c of 
      Fin (Lam v e) -> do
         x <- newFVar
@@ -207,7 +206,13 @@ traceExpr e = do
   s <- get
   trace (printDoc (printState e s)) $ return e 
 
-                      
+bindLets :: Monad m => Expr -> ReachT m Expr'
+bindLets (Let x e e') = do
+  e'' <- bind x e e'  
+  bindLets e''
+bindLets (Expr a cs) = return (a, cs)
+
+                       
 --reduceTrace :: Monad m => Reduce m -> Reduce m
 --reduceTrace r e cs = do
 --  traceExpr (Expr e cs)
@@ -260,7 +265,7 @@ reduce r (LVar x) cs = return $ SuspL x cs
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
-  | cid == cid' = return $ LMap (I.fromList (zip xs es)) c
+  | cid == cid' = replaceLVars xs es c
 --      vs <- scopingExpr c
 --      vs' <- I.unions <$> mapM scopeAtom es
 --      if null (I.intersection (I.union (I.fromList (zip xs (repeat ()))) vs) vs')
@@ -281,13 +286,13 @@ binds _ _ _ = error "Constructor / Alterenative variable mismatch"
 bind :: Monad m => LId -> Expr -> Expr -> ReachT m Expr 
 bind v e c = do
   ev <- evar e
-  return $ LMap (I.singleton v (EVar ev)) c
+  replaceLVar v (EVar ev) c 
 
 lbind :: Monad m => LId -> Expr -> ReachT m (LId, Expr)
 lbind v e = do
   lv <- lvar
---  e' <- replaceLVar v (LVar lv) e
-  return (lv, LMap (I.singleton v (LVar lv)) e)
+  e' <- replaceLVar v (LVar lv) e
+  return (lv, e')
 
 
 lbinds :: Monad m => [LId] -> Expr -> ReachT m ([LId], Expr)
@@ -321,86 +326,39 @@ evar e = do
 evars :: Monad m => [Expr] -> ReachT m [EId]
 evars = mapM evar 
 
-bindLets :: Monad m => Expr -> ReachT m Expr'
-bindLets (Let x e e') = do
-  e'' <- bind x e e'  
-  bindLets e''
-bindLets (LMap f e) = bindLocals f e
-bindLets (Expr a cs) = return (a, cs)
+replaceLVars :: Monad m => [LId] -> [Atom] -> Expr -> ReachT m Expr
+replaceLVars [] [] e = return e
+replaceLVars (v : vs) (e : es) e' = replaceLVar v e e' >>= replaceLVars vs es
 
-bindLocals :: Monad m => IntMap Atom -> Expr -> ReachT m Expr'
-bindLocals f e | I.null f = bindLets e
-               | otherwise = bindLocals' f e
+replaceLVar :: Monad m => LId -> Atom -> Expr -> ReachT m Expr
+replaceLVar v a (Let x e e')
+  | x == v    = return $ Let x e e'
+  | otherwise = Let x <$> replaceLVar v a e <*> replaceLVar v a e'
+replaceLVar v a (Expr e cs) = Expr <$> replaceAtom v a e <*> mapM replaceConts cs
+   where
+     replaceConts (Apply e) = Apply <$> replaceLVar v a e
+     replaceConts (Branch t as) = Branch t <$> mapM replaceAlt as
 
-bindLocals' :: Monad m => IntMap Atom -> Expr -> ReachT m Expr'
-bindLocals' f (LMap g e) = do
---  fg <- sequence $ I.unionWith (\a _ -> a >>= substAtom g) (fmap return f) (fmap return g)
-  let fg = I.unionWith (\a _ -> error "bindLocals.. overwrite") f g
-  bindLocals' fg e
-bindLocals' f (Let x e e') = do
-  ev <- evar (LMap f e)
-  let fg = I.insertWith (error "bindLocals.. overwrite") x (LVar ev) f
-  bindLocals' fg e'
-bindLocals' f (Expr a cs) = do
-  a' <- substAtom f a
-  cs' <- mapM (substCont f) cs
-  return (a', cs')
+     replaceAlt (Alt c vs e)
+       | v `elem` vs  = return $ Alt c vs e
+       | otherwise    = Alt c vs <$> replaceLVar v a e
+     replaceAlt (AltDef e) = AltDef <$> replaceLVar v a e
 
-
---  bindLet x (LMap f e)
-
-substCont :: Monad m => (IntMap Atom) -> Conts -> ReachT m Conts
-substCont f (Apply e) = return $ Apply (LMap f e)
-substCont f (Branch b as) = return $ Branch b (map substAlt as)
-   where substAlt (Alt cid vs e) = Alt cid vs (LMap (foldr I.delete f vs) e)
-         substAlt (AltDef e) = AltDef (LMap f e)
-
-substAtom :: Monad m => (IntMap Atom) -> Atom -> ReachT m Atom
-substAtom f (Fun g) = return $ Fun g
-substAtom f (EVar v) = do
-  env . at' v %= LMap f 
-  return (EVar v)
-substAtom f (LVar v) = return $ case I.lookup v f of
-  Nothing -> LVar v
-  Just a -> a
-substAtom f (Lam v e) = return $ Lam v (LMap (I.delete v f) e)
-substAtom f (FVar x) = return $ FVar x
-substAtom f (Con cid es) = Con cid <$> mapM (substAtom f) es
- 
-
---replaceLVars :: Monad m => [LId] -> [Atom] -> Expr -> ReachT m Expr
---replaceLVars [] [] e = return e
---replaceLVars (v : vs) (e : es) e' = replaceLVar v e e' >>= replaceLVars vs es
---
---replaceLVar :: Monad m => LId -> Atom -> Expr -> ReachT m Expr
---replaceLVar v a (Let x e e')
---  | x == v    = return $ Let x e e'
---  | otherwise = Let x <$> replaceLVar v a e <*> replaceLVar v a e'
---replaceLVar v a (Expr e cs) = Expr <$> replaceAtom v a e <*> mapM replaceConts cs
---   where
---     replaceConts (Apply e) = Apply <$> replaceLVar v a e
---     replaceConts (Branch t as) = Branch t <$> mapM replaceAlt as
---
---     replaceAlt (Alt c vs e)
---       | v `elem` vs  = return $ Alt c vs e
---       | otherwise    = Alt c vs <$> replaceLVar v a e
---     replaceAlt (AltDef e) = AltDef <$> replaceLVar v a e
---
---replaceAtom :: Monad m => LId -> Atom -> Atom -> ReachT m Atom
---replaceAtom v a (Fun f) = return $ Fun f
---replaceAtom v a (EVar x) = do
---  e <- use (env . at' x)
---  e' <- replaceLVar v a e
---  env . at x ?= e'
---  return $ EVar x
---replaceAtom v a (LVar v')
---  | v == v'   = return a 
---  | otherwise = return $ LVar v' 
---replaceAtom v a (Lam x e)
---  | v == x    = return $ Lam x e
---  | otherwise = Lam x <$> replaceLVar v a e
---replaceAtom v a (FVar x) = return $ FVar x
---replaceAtom v a (Con c as) = Con c <$> mapM (replaceAtom v a) as
+replaceAtom :: Monad m => LId -> Atom -> Atom -> ReachT m Atom
+replaceAtom v a (Fun f) = return $ Fun f
+replaceAtom v a (EVar x) = do
+  e <- use (env . at' x)
+  e' <- replaceLVar v a e
+  env . at x ?= e'
+  return $ EVar x
+replaceAtom v a (LVar v')
+  | v == v'   = return a 
+  | otherwise = return $ LVar v' 
+replaceAtom v a (Lam x e)
+  | v == x    = return $ Lam x e
+  | otherwise = Lam x <$> replaceLVar v a e
+replaceAtom v a (FVar x) = return $ FVar x
+replaceAtom v a (Con c as) = Con c <$> mapM (replaceAtom v a) as
 
 newFVars :: Monad m => Int -> ReachT m [FId]
 newFVars n = replicateM n newFVar
