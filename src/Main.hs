@@ -1,7 +1,8 @@
 
 import qualified Reach.Parser.Module as P
 import qualified Reach.Parser.Conv as C
-import Reach.Eval.Cont
+import Reach.Eval.Lazy
+import Reach.Eval.Full
 import Reach.Eval.Expr
 import Reach.Eval.Env
 import Reach.Lens
