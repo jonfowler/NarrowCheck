@@ -63,7 +63,7 @@ setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
 convModule :: Int -> Module -> Env
 convModule i m = Env {
-             _funcs = I.fromList $ map (convFun c) (M.toList $ m ^. moduleDef),
+             _funcs = I.fromList $ map (convFunc c) (M.toList $ m ^. moduleDef),
              _funcArgTypes = I.fromList $ map (convFuncArg c) (M.toList $ m ^. moduleTypeDef),
 
              _free = I.empty,
@@ -105,12 +105,12 @@ getArgs :: PType -> [TypeId]
 getArgs (Type _) = []
 getArgs (Type tid :-> t) = tid : getArgs t
 
-convFun :: Convert -> (VarId, [PDef]) -> (FuncId, Func)
-convFun c (vid, qs) = case runExcept . runStateT s $ c of
+convFunc :: Convert -> (VarId, [PDef]) -> (FuncId, Func)
+convFunc c (vid, qs) = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (
     fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
-    Func {_body = e,
+    Func {_body = functionExpr e,
           _vars = c' ^. convertLocals . nextInt
           })
  where s = convExpr (desugar qs) []
@@ -118,6 +118,27 @@ convFun c (vid, qs) = case runExcept . runStateT s $ c of
 
 aVar :: Pattern -> VarId
 aVar (PatVar x) = x
+
+functionExpr :: Expr -> (Int -> Expr)
+functionExpr = flip replaceExpr
+
+replaceExpr :: Int -> Expr -> Expr
+replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
+replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
+   where
+     replaceConts (Apply e) = Apply (replaceExpr v e)
+     replaceConts (Branch as) = Branch (map replaceAlt as)
+
+     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
+     replaceAlt (AltDef e) = AltDef (replaceExpr v e)
+
+replaceAtom :: Int -> Atom -> Atom
+replaceAtom v (Fun f) = Fun f
+replaceAtom v (Var x) = Var (v + x)
+replaceAtom v (Lam x e) = Lam (v + x) (replaceExpr v e)
+replaceAtom v (FVar x) = FVar x
+replaceAtom v (Con c as) = Con c (map (replaceAtom v) as)
+
 
 convArgs :: [VarId] -> ConvertM (Expr -> Expr)
 convArgs [] = return id
@@ -133,13 +154,13 @@ atomise (Let x e e') = do
 atomise (Expr e []) = return (id, e)
 atomise e = do
   x <- overConv convertLocals  ""
-  return (Let x e , LVar x)
+  return (Let x e , Var x)
 
 atomises :: [Expr] -> ConvertM (Expr -> Expr, [Atom])
 atomises es = foldr (\(f , a) (g , as) -> (f . g, a : as)) (id , []) <$> mapM atomise es
  
 convExpr :: PExpr -> [Conts] -> ConvertM Expr
-convExpr (PVar vid) cs = Expr <$> (LVar <$> viewConv convertLocals vid) <*> pure cs
+convExpr (PVar vid) cs = Expr <$> (Var <$> viewConv convertLocals vid) <*> pure cs
                     <|> Expr <$> (Fun <$> viewConv convertFuncId vid) <*> pure cs
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
 convExpr (PCon cid es) cs = do
@@ -158,7 +179,7 @@ convExpr (PLam v e) cs = do
 convExpr (PParens e) cs = convExpr e cs
 convExpr (PCase e as) cs = do
   as' <- mapM convAlt as
-  convExpr e (Branch False as' : cs)
+  convExpr e (Branch as' : cs)
 
 
 convAlt :: PAlt PExpr -> ConvertM (Alt Expr)

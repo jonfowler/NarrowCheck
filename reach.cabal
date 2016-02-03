@@ -17,6 +17,8 @@ cabal-version:       >=1.10
 
 executable reach
   main-is:             Main.hs
+  ghc-options:
+    -O2
   -- other-modules:       
   build-depends:       base ==4.*, 
                        mtl >=2.2.1, 

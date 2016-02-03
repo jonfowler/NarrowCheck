@@ -16,8 +16,11 @@ s3 = S s2
 s4 = S s3
 
 --all :: (Nat -> Bool) -> Tree ->  Bool
-all p Leaf = True 
-all p (Node t1 x t2) = p x && all p t1 && all p t2
+allle i Leaf = True 
+allle i (Node t1 x t2) = x <= i && allle i t1 && allle i t2
+
+allge i Leaf = True
+allge i (Node t1 x t2) = x >= i && allge i t1 && allge i t2
 
 del n Leaf = Leaf
 del n (Node t1 a t2) = case a < n of
@@ -30,6 +33,6 @@ ext Leaf t2 = t2
 ext (Node t11 a t12) t2 = Node t11 a (ext t12 t2)
 
 ord Leaf = True
-ord (Node t1 a t2) = all (a >=) t1 && all (a <=) t2
+ord (Node t1 a t2) = allge a t1 && allle a t2
 
 prop_ordDel n t = ord t ==> ord (del n t)

@@ -20,7 +20,7 @@ type Type = Int
 data Alt a = Alt !CId [LId] a
            | AltDef a deriving (Show, Functor, Foldable, Traversable)
 
-data Conts = Branch !Bool [Alt Expr]
+data Conts = Branch [Alt Expr]
            | Apply Expr deriving (Show)
 
 data Expr = Expr Atom [Conts]
@@ -32,11 +32,11 @@ data Atom
 
   -- Environment variables are the variables used to implement
   -- call by need evaluation.
-  | EVar !EId
+--  | EVar !EId
 
   -- The "local" variables are variables scoped by lambdas, they
   -- are converted to environment variables when they are bound.
-  | LVar !LId
+  | Var !LId
 
   -- FVar's are the free variables
   | FVar !FId
@@ -60,15 +60,14 @@ closedExpr' vs (Expr a cs) = closedAtom vs a && all (closedConts vs) cs
 
 closedAtom :: [LId] -> Atom -> Bool
 closedAtom vs (Fun _) = True
-closedAtom vs (EVar _) = True
-closedAtom vs (LVar v) = v `elem` vs
+closedAtom vs (Var v) = v `elem` vs
 closedAtom vs (FVar _) = True
 closedAtom vs (Lam v e) = closedExpr' (v : vs) e
 closedAtom vs (Con _ as) = all (closedAtom vs) as
 
 closedConts :: [LId] -> Conts -> Bool
 closedConts vs (Apply e) = closedExpr' vs e
-closedConts vs (Branch _ as) = all closedAlt as
+closedConts vs (Branch as) = all closedAlt as
   where closedAlt (Alt _ vs' e) = closedExpr' (vs' ++ vs) e
 
 atom :: Atom -> Expr
@@ -85,9 +84,9 @@ atom a = Expr a []
 -- Atoms are nested constructors with variables at their leaves.
 
 data Func =
-  Func {_body :: Expr,
+  Func {_body :: Int -> Expr,
         _vars :: !Int
-       } deriving Show
+       } -- deriving Show
 
 makeLenses ''Func
 

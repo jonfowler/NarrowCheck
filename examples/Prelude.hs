@@ -14,9 +14,12 @@ Z <= y = True
 S x <= Z = False
 S x <= S y = x <= y
 
-x < y = not (x >= y)  
+Z < Z = False
+Z < S x = True
+S x < Z = False
+S x < S y = x < y
 
-x >= y =  y <= x
+x >= y = y <= x
 
 x == y = case x of
   Z -> case y of
@@ -26,7 +29,7 @@ x == y = case x of
     Z -> False
     S y2 -> x2 == y2
 
-x > y = not (x <= y) 
+x > y = y < x 
 
 x + y = case x of
   Z -> y

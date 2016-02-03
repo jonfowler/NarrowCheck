@@ -33,8 +33,7 @@ printAtom s = fst . printAtom' s
 
 printAtom' :: Env -> Atom -> (Doc, Bool)
 printAtom' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
-printAtom' s (EVar x) = (var "e" x , False)
-printAtom' s (LVar x) = (var "v" x , False)
+printAtom' s (Var x) = (var "v" x , False)
 printAtom' s (FVar x) = (var "x" x , False)
 printAtom' s (Con cid []) = (text (s ^. constrNames . at' cid)
                             , False)
@@ -61,7 +60,7 @@ printExpr' s (Expr e cs) = printConts s (printAtom' s e) cs
 
 printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
 printConts s d [] = d
-printConts s (d , _) (Branch _ as : cs) = printConts s (text "case"
+printConts s (d , _) (Branch as : cs) = printConts s (text "case"
                                       <+> nest 2 (d
                                       <+>  (text "of" <$>
                                               (vsep . map (printAlt s (printExpr s))) as))

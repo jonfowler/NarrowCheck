@@ -38,7 +38,7 @@ data Env = Env {
   _funcIds :: Map String FuncId,
   _constrNames :: IntMap String,
   _constrIds :: Map String CId
-  } deriving Show
+  } --deriving Show
 
 makeLenses ''Env
 
