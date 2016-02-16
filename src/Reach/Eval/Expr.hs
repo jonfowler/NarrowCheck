@@ -20,7 +20,11 @@ type Type = Int
 data Alt a = Alt !CId [LId] a
            | AltDef a deriving (Show, Functor, Foldable, Traversable)
 
-data Conts = Branch [Alt Expr]
+altExpr :: Alt a -> a                               
+altExpr (Alt _ _ e) = e
+altExpr (AltDef e) = e
+
+data Conts = Branch Expr [Alt Expr]
            | Apply Expr deriving (Show)
 
 data Expr = Expr Atom [Conts]
@@ -42,6 +46,8 @@ data Atom
   | FVar !FId
 --  | App Expr Expr 
   | Lam !LId Expr
+
+  | Bottom
 --  | Case Expr [Alt Expr] 
 
   -- A constructors arguments should be atoms: either a variable or
@@ -67,7 +73,7 @@ closedAtom vs (Con _ as) = all (closedAtom vs) as
 
 closedConts :: [LId] -> Conts -> Bool
 closedConts vs (Apply e) = closedExpr' vs e
-closedConts vs (Branch as) = all closedAlt as
+closedConts vs (Branch a as) = closedExpr' vs a && all closedAlt as
   where closedAlt (Alt _ vs' e) = closedExpr' (vs' ++ vs) e
 
 atom :: Atom -> Expr
@@ -82,6 +88,29 @@ atom a = Expr a []
 
 
 -- Atoms are nested constructors with variables at their leaves.
+
+lazify :: Expr -> Expr
+lazify (Let x e e')  = Let x (lazify e) (lazify e') 
+lazify (Expr e cs) = Expr (lazifyAtom e) (map lazifyCont cs)
+
+lazifyAtom :: Atom -> Atom                     
+lazifyAtom = undefined
+
+lazifyCont :: Conts -> Conts
+lazifyCont (Apply e) = Apply (lazify e)
+lazifyCont (Branch _ as) = Branch (unifyList (map altExpr as)) as
+
+unifyList :: [Expr] -> Expr                            
+unifyList [e] = e
+unifyList (e : es) = unify e (unifyList es)
+
+unify :: Expr -> Expr -> Expr
+unify _ (Let x e e') = Expr Bottom []
+unify e (Expr a []) = unifyAtom e a
+
+unifyAtom :: Expr -> Atom -> Expr
+unifyAtom = undefined
+         
 
 data Func =
   Func {_body :: Expr,

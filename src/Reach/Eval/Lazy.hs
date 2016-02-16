@@ -36,9 +36,9 @@ evalLazy (e, conts) = do
         x <- newFVar
         evalLazy (Lam v e, [Apply . atom . FVar $ x])
      Fin a -> return a
-     Susp x (Branch as : cs) -> do
+     Susp x (Branch a as : cs) -> do
        (cid, xs) <- choose x
-       evalLazy (Con cid (map FVar xs), Branch as : cs)
+       evalLazy (Con cid (map FVar xs), Branch a as : cs)
      SuspL v _ -> error "Should not be suspended on local variable in evalLazy"
 
 choose :: MonadChoice m => FId -> ReachT m (CId, [FId])

@@ -32,7 +32,7 @@ reduce r (Lam x e') (Apply e : cs) = do
   bind x e
   (e'', cs') <- bindLets e'
   r e'' (cs' ++ cs)
-reduce r (Con cid es) (Branch as : cs) = do
+reduce r (Con cid es) (Branch a as : cs) = do
   (e, cs') <- match cid es as >>= bindLets
   r e (cs' ++ cs)
 reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemented yet"
@@ -91,7 +91,7 @@ replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
 replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
    where
      replaceConts (Apply e) = Apply (replaceExpr v e)
-     replaceConts (Branch as) = Branch (map replaceAlt as)
+     replaceConts (Branch a as) = Branch (replaceExpr v a) (map replaceAlt as)
 
      replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
      replaceAlt (AltDef e) = AltDef (replaceExpr v e)

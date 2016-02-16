@@ -60,7 +60,7 @@ printExpr' s (Expr e cs) = printConts s (printAtom' s e) cs
 
 printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
 printConts s d [] = d
-printConts s (d , _) (Branch as : cs) = printConts s (text "case"
+printConts s (d , _) (Branch _ as : cs) = printConts s (text "case"
                                       <+> nest 2 (d
                                       <+>  (text "of" <$>
                                               (vsep . map (printAlt s (printExpr s))) as))

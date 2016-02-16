@@ -84,9 +84,6 @@ go fn flags = do
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
 
---  printResults (length . rights $ rs)
-  -- filter (\(Con cid _, _) -> cid == fal) .
-
 
 printResults :: [(Atom, Env)] -> IO ()
 printResults = mapM_ (\(e,env) -> do {putStrLn (showAtom env e ++ " ->"); printFVars (env ^. topFrees) env})
