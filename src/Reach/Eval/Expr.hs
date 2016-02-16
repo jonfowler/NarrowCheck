@@ -106,10 +106,10 @@ unifyList (e : es) = unify e (unifyList es)
 
 unify :: Expr -> Expr -> Expr
 unify _ (Let x e e') = Expr Bottom []
-unify e (Expr a []) = unifyAtom e a
+unify e (Expr a cs) = unify' e a cs
 
-unifyAtom :: Expr -> Atom -> Expr
-unifyAtom = undefined
+unify' :: Expr -> Atom -> [Conts] -> Expr
+unify' e a [] = unifyAtom e a
          
 
 data Func =
