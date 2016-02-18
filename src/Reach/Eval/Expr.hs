@@ -40,6 +40,7 @@ data Expr
 
   | Bottom
   | Case Expr Expr [Alt Expr] 
+  | App Expr Expr
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression
   -- is only evaluated once.

@@ -12,52 +12,84 @@ import qualified Data.IntMap as I
 
 import Debug.Trace
 
-type Reduce m = Atom -> [Conts] -> ReachT m Susp 
-type Expr' = (Atom, [Conts])
-
-data Susp = Susp FId [Conts]
-          | SuspL LId [Conts]
+type Reduce m = Expr -> ReachT m Susp
+--type Expr' = (Atom, [Conts])
+--
+data Susp = Susp FId Expr
           | Fin Atom deriving Show
 
-reduceTrace :: Monad m => Reduce m -> Reduce m
-reduceTrace r e cs = do
-  s <- get
-  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
+--reduceTrace :: Monad m => Reduce m -> Reduce m
+--reduceTrace r e cs = do
+--  s <- get
+--  trace (printDoc (printState (Expr e cs) s)) $ reduce r e cs
 
 
 reduce :: Monad m => Reduce m -> Reduce m
-reduce r (Lam x e)    [] = return . Fin $ Lam x e
-reduce r (Con cid es) [] = return . Fin $ Con cid es
-reduce r (Lam x e') (Apply e : cs) = do
+reduce r (Let x e e') = do
   bind x e
-  (e'', cs') <- bindLets e'
-  r e'' (cs' ++ cs)
-reduce r (Con cid es) (Branch a as : cs) = do
-  (e, cs') <- match cid es as >>= bindLets
-  r e (cs' ++ cs)
-reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemented yet"
+  r e'
+reduce r (Lam x e) = return . Fin $ Lam x e
+reduce r (Con cid es) = return . Fin $ Con cid es
+reduce r (App (Lam x e') e) = do
+  bind x e
+  r e' 
+reduce r (App (Con _ _) e) = fail "Type error at runtime" 
+reduce r (App e e') = do
+  a <- reduce r e
+  case a of
+    Fin e -> r (App e e')
+    Susp x e -> return $ Susp x (App e e')
+reduce r (Case (Con cid es) e' as) = do
+  e <- match cid es as
+  r e
 reduce r (Fun fid) cs = do
-  e <- use (funcs . at' fid) >>= inlineFunc 
-  (e', cs') <- bindLets e
-  r e' (cs' ++ cs) 
-reduce r (Var ev) cs = do
-  (e, cs') <- use (env . at' ev) >>= bindLets
-  s <- r e cs'
-  case s of
-    Susp x cs'' -> do
-      env . at ev ?= Expr (FVar x) cs''
-      return (Susp x (cs'' ++ cs))
-    SuspL v cs'' -> do
-      env . at ev ?= Expr (Var v) cs''
-      return (SuspL v (cs'' ++ cs))
+ e <- use (funcs . at' fid) >>= inlineFunc 
+ r e 
+reduce r (Case e e' as) = do
+  a <- reduce r e
+  case a of
+    Fin c -> r (Case c e' as)
+    Susp x e -> return $ Susp x (Case e e' as)
+reduce r (Var v) = do
+  e <- use (env . at' v)
+  a <- r e
+  case a of
     Fin a -> do
-      env . at ev ?= Expr a [] 
-      r a cs
-reduce r (FVar x) cs = do
-  c <- use (free . at x)
-  case c of
-    Just (cid, fids) -> r (Con cid (map FVar fids)) cs
-    Nothing -> return $ Susp x cs
+      env . at v ?= a
+      return (Fin a)
+    Susp x e -> do
+      env . at v ?= e
+      return (Susp x (Var v))
+reduce r (FVar x) = do
+  a <- use (free . at x)
+  case a of
+    Just (cid, fids) -> return $ Fin (Con cid (FVar <$> fids))
+    Nothing -> return (Susp x (FVar x))
+
+--reduce r (Con cid es) (Branch a as : cs) = do
+--  (e, cs') <- match cid es as >>= bindLets
+--  r e (cs' ++ cs)
+--reduce r (Con cid es) (Apply e : cs) = fail "Partial constructors not implemented yet"
+
+
+--reduce r (Var ev) cs = do
+--  (e, cs') <- use (env . at' ev) >>= bindLets
+--  s <- r e cs'
+--  case s of
+--    Susp x cs'' -> do
+--      env . at ev ?= Expr (FVar x) cs''
+--      return (Susp x (cs'' ++ cs))
+--    SuspL v cs'' -> do
+--      env . at ev ?= Expr (Var v) cs''
+--      return (SuspL v (cs'' ++ cs))
+--    Fin a -> do
+--      env . at ev ?= Expr a [] 
+--      r a cs
+--reduce r (FVar x) cs = do
+--  c <- use (free . at x)
+--  case c of
+--    Just (cid, fids) -> r (Con cid (map FVar fids)) cs
+--    Nothing -> return $ Susp x cs
 
 inlineFunc :: Monad m => Func -> ReachT m Expr
 inlineFunc (Func e vs) = do 
@@ -67,7 +99,7 @@ inlineFunc (Func e vs) = do
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
-  | cid == cid' = binds xs (map atom es) >> return c
+  | cid == cid' = binds xs es >> return c
   | otherwise   = match cid es as
 match  cid es (AltDef e : _) = return e
 match _ _ [] = error "REACH_ERROR: no match for constructor in case"
@@ -80,26 +112,32 @@ binds vs es = mapM_ (uncurry bind) (zip vs es)
 bind :: Monad m => LId -> Expr -> ReachT m ()
 bind v e = env . at v ?= e
 
-bindLets :: Monad m => Expr -> ReachT m Expr'
-bindLets (Let x e e') = do
-  e'' <- bind x e
-  bindLets e'
-bindLets (Expr a cs) = return (a, cs)
+--bindLets :: Monad m => Expr -> ReachT m Expr'
+--bindLets (Let x e e') = do
+--  e'' <- bind x e
+--  bindLets e'
+--bindLets (Expr a cs) = return (a, cs)
+
+--replaceExpr :: Int -> Expr -> Expr
+--replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
+--replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
+--   where
+--     replaceConts (Apply e) = Apply (replaceExpr v e)
+--     replaceConts (Branch a as) = Branch (replaceExpr v a) (map replaceAlt as)
+--
+--     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
+--     replaceAlt (AltDef e) = AltDef (replaceExpr v e)
 
 replaceExpr :: Int -> Expr -> Expr
-replaceExpr v (Let x e e') = Let (x + v) (replaceExpr v e) (replaceExpr v e')
-replaceExpr v (Expr e cs) = Expr (replaceAtom v e) (map replaceConts cs)
-   where
-     replaceConts (Apply e) = Apply (replaceExpr v e)
-     replaceConts (Branch a as) = Branch (replaceExpr v a) (map replaceAlt as)
-
-     replaceAlt (Alt c vs e) = Alt c (map (v+) vs) (replaceExpr v e)
-     replaceAlt (AltDef e) = AltDef (replaceExpr v e)
-
-replaceAtom :: Int -> Atom -> Atom
-replaceAtom v (Fun f) = Fun f
-replaceAtom v (Var x) = Var (v + x)
-replaceAtom v (Lam x e) = Lam (v + x) (replaceExpr v e)
-replaceAtom v (FVar x) = FVar x
-replaceAtom v (Con c as) = Con c (map (replaceAtom v) as)
+replaceExpr v (Let x e e') = Let x (replaceExpr v e) (replaceExpr v e')
+replaceExpr v (Fun f) = Fun f
+replaceExpr v (Var x) = Var (v + x)
+replaceExpr v (Lam x e) = Lam (v + x) (replaceExpr v e)
+replaceExpr v (FVar x) = FVar x
+replaceExpr v Bottom = Bottom
+replaceExpr v (Case e e' as) = Case (replaceExpr v e)
+                                    (replaceExpr v e')
+                                    (map (fmap (replaceExpr v)) as)
+replaceExpr v (App e e') = App (replaceExpr v e) (replaceExpr v e')
+replaceExpr v (Con c as) = Con c (map (replaceExpr v) as)
 
