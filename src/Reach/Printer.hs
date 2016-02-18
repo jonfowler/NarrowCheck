@@ -28,50 +28,50 @@ bracket (d , False) = d
 var :: String -> Int -> Doc
 var s i = text (s ++ show i)
 
-printAtom :: Env -> Atom -> Doc
-printAtom s = fst . printAtom' s
-
-printAtom' :: Env -> Atom -> (Doc, Bool)
-printAtom' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
-printAtom' s (Var x) = (var "v" x , False)
-printAtom' s (FVar x) = (var "x" x , False)
-printAtom' s (Con cid []) = (text (s ^. constrNames . at' cid)
-                            , False)
-printAtom' s (Con cid es) = (text (s ^. constrNames . at' cid)
-                            <+> (group . hsep . map (bracket . printAtom' s) $ es)
-                            , True)
-printAtom' s (Fun fid) = (text (s ^. funcNames . at' fid), False)
- 
 printExpr :: Env -> Expr -> Doc
-printExpr s =  fst . printExpr' s 
+printExpr s = fst . printExpr' s
+
+printExpr' :: Env -> Expr -> (Doc, Bool)
+printExpr' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
+printExpr' s (Var x) = (var "v" x , False)
+printExpr' s (FVar x) = (var "x" x , False)
+printExpr' s (Con cid []) = (text (s ^. constrNames . at' cid)
+                            , False)
+printExpr' s (Con cid es) = (text (s ^. constrNames . at' cid)
+                            <+> (group . hsep . map (bracket . printExpr' s) $ es)
+                            , True)
+printExpr' s (Fun fid) = (text (s ^. funcNames . at' fid), False)
+ 
+--printExpr :: Env -> Expr -> Doc
+--printExpr s =  fst . printExpr' s 
 
 --toAppList :: Expr -> [Expr]
 --toAppList (Expr e (Apply e' : cs)) = e : toAppList (Expr e' cs)
 --toAppList e = [e]
 
-printExpr' :: Env -> Expr -> (Doc, Bool)
-printExpr' s (Let v e e') = (text "let" <+> var "v" v
-                                        <+> text "="
-                                        <+> printExpr s e
-                                        <+> text "in"
-                                        <+> printExpr s e'
-                            , True)
-printExpr' s (Expr e cs) = printConts s (printAtom' s e) cs
+--printExpr' :: Env -> Expr -> (Doc, Bool)
+--printExpr' s (Let v e e') = (text "let" <+> var "v" v
+--                                        <+> text "="
+--                                        <+> printExpr s e
+--                                        <+> text "in"
+--                                        <+> printExpr s e'
+--                            , True)
+--printExpr' s (Expr e cs) = printConts s (printExpr' s e) cs
 
-printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
-printConts s d [] = d
-printConts s (d , _) (Branch _ as : cs) = printConts s (text "case"
-                                      <+> nest 2 (d
-                                      <+>  (text "of" <$>
-                                              (vsep . map (printAlt s (printExpr s))) as))
-                           , True) cs
-
-printConts s d cs@(Apply _ : _) =  let (es , cs') = allApps cs in
-  printConts s (bracketer (d : map (printExpr' s) es), True) cs'
-
-allApps :: [Conts] -> ([Expr] , [Conts])
-allApps (Apply e : cs) = let (es , cs') = allApps cs in (e : es, cs')
-allApps cs = ([], cs)
+--printConts :: Env -> (Doc , Bool) -> [Conts] -> (Doc, Bool)
+--printConts s d [] = d
+--printConts s (d , _) (Branch _ as : cs) = printConts s (text "case"
+--                                      <+> nest 2 (d
+--                                      <+>  (text "of" <$>
+--                                              (vsep . map (printAlt s (printExpr s))) as))
+--                           , True) cs
+--
+--printConts s d cs@(Apply _ : _) =  let (es , cs') = allApps cs in
+--  printConts s (bracketer (d : map (printExpr' s) es), True) cs'
+--
+--allApps :: [Conts] -> ([Expr] , [Conts])
+--allApps (Apply e : cs) = let (es , cs') = allApps cs in (e : es, cs')
+--allApps cs = ([], cs)
                                                         
 
 
