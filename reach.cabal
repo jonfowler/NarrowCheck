@@ -45,7 +45,6 @@ executable reach
     Reach.Eval.Expr,
     Reach.Eval.Lazy,
     Reach.Eval.Full,
-    Reach.Eval.Gen,
     Reach.Eval.Monad,
     Reach.Printer,
     Reach.Lens,

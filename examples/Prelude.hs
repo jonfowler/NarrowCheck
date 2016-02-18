@@ -29,6 +29,8 @@ x == y = case x of
     Z -> False
     S y2 -> x2 == y2
 
+x /= y = not (x == y)
+
 x > y = y < x 
 
 x + y = case x of
@@ -45,4 +47,13 @@ x || y = case x of
 
 False ==> x = True -- further test
 True ==> x = x 
+
+s1 = S Z
+s2 = S s1 
+s3 = S s2
+s4 = S s3
+s5 = S s4
+s6 = S s5
+s7 = S s6
+s8 = S s7
 

@@ -3,6 +3,7 @@ module Reach.Eval.Expr where
 --import Reach.Lens
 
 import Control.Lens
+import Data.Maybe
 
 import Control.Monad
 
@@ -18,7 +19,7 @@ type Type = Int
 
 
 data Alt a = Alt {-# UNPACK #-} !CId [LId] a
-           | AltDef a deriving (Show, Functor, Foldable, Traversable)
+           | AltDef a deriving (Show, Functor, Foldable, Traversable, Eq)
 
 altExpr :: Alt a -> a                               
 altExpr (Alt _ _ e) = e
@@ -44,9 +45,20 @@ data Expr
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression
   -- is only evaluated once.
-  | Con {-# UNPACK #-} !CId [Atom] deriving Show
+  | Con {-# UNPACK #-} !CId [Atom] deriving (Show, Eq)
+                         
 
 type Atom = Expr
+
+atom :: Expr -> Bool            
+atom (Var _) = True
+atom (FVar _) = True
+atom (Lam _ _) = error "lambda should not be tested whether atom is"
+atom (Fun _) = True
+atom (Con _ _) = True
+atom Bottom = True
+atom _ = False
+
                             
 --closedExpr :: Expr -> Bool
 --closedExpr = closedExpr' []
@@ -80,10 +92,22 @@ type Atom = Expr
 
 -- Atoms are nested constructors with variables at their leaves.
 
---lazify :: Expr -> Expr
---lazify (Let x e e')  = Let x (lazify e) (lazify e') 
---lazify (Expr e cs) = Expr (lazifyAtom e) (map lazifyCont cs)
---
+lazify :: Expr -> Expr
+lazify = lazify' []
+
+lazify' :: [LId] -> Expr -> Expr
+lazify' vs (Lam v e) = Lam v (lazify' (v : vs) e) 
+lazify' vs (Let v e e') = Let v (lazify' vs e) (lazify' (v : vs) e')
+lazify' vs (Fun fid) = Fun fid
+lazify' vs (FVar x) = FVar x
+lazify' vs (Var v) = Var v
+lazify' vs (App e e') = App (lazify' vs e) (lazify' vs e')
+lazify' vs (Con cid es) = Con cid (map (lazify' vs) es)
+lazify' vs (Case e _ as) = Case (lazify e) (unifyList (map (delocalise vs . altExpr) as')) as'
+    where as' = lazifyAlt <$> as 
+          lazifyAlt (Alt cid vs' e) = Alt cid vs' (lazify' (vs' ++ vs) e)
+          lazifyAlt (AltDef e) = AltDef (lazify' vs e)
+
 --lazifyAtom :: Atom -> Atom                     
 --lazifyAtom = undefined
 --
@@ -91,17 +115,59 @@ type Atom = Expr
 --lazifyCont (Apply e) = Apply (lazify e)
 --lazifyCont (Branch _ as) = Branch (unifyList (map altExpr as)) as
 --
---unifyList :: [Expr] -> Expr                            
---unifyList [e] = e
---unifyList (e : es) = unify e (unifyList es)
---
---unify :: Expr -> Expr -> Expr
---unify _ (Let x e e') = Expr Bottom []
---unify e (Expr a cs) = unify' e a cs
---
---unify' :: Expr -> Atom -> [Conts] -> Expr
---unify' e a [] = unifyAtom e a
-         
+unifyList :: [Expr] -> Expr                            
+unifyList [e] = e
+unifyList (e : es) = unify e (unifyList es)
+
+unify :: Expr -> Expr -> Expr
+unify Bottom _ = Bottom
+unify _ Bottom = Bottom
+unify (Con cid []) (Con cid' [])
+  | cid == cid' = Con cid []
+  | otherwise = Bottom
+unify (Con cid es) (Con cid' es')
+  | cid == cid' = error "just delete this for now"
+  | otherwise = Bottom
+unify (Let x e e') _ = Bottom
+unify _ (Let x e e') = Bottom
+unify (Var v) (Var v')
+  | v == v' = Var v
+  | otherwise = error "does different variables happen???" 
+unify (Case e d as) e' = deCase e (unify d e') (fmap (unify e') <$> as)
+unify e' (Case e d as) = deCase e (unify d e') (fmap (unify e') <$> as)
+unify e (Con cid []) = Case e Bottom [Alt cid [] (Con cid [])]
+unify (Con cid []) e = Case e Bottom [Alt cid [] (Con cid [])]
+unify _ _ = Bottom
+
+delocalise :: [LId] -> Expr -> Expr
+delocalise vs (Let v e e') = Bottom
+delocalise vs (Lam v e) = Lam v (delocalise (v : vs) e)
+delocalise vs (Var v) | v `elem` vs = Var v
+                      | otherwise = Bottom
+delocalise vs (Fun f) = Fun f
+delocalise vs (App e e') = deApp (delocalise vs e) (delocalise vs e')
+delocalise vs (Con cid es) = Con cid (map (delocalise vs) es)
+delocalise vs (FVar x) = FVar x
+delocalise vs Bottom = Bottom
+delocalise vs (Case e e' as) = deCase (delocalise vs e) (delocalise vs e') (mapMaybe delocalAlt as)
+   where                            
+   delocalAlt (Alt cid vs' e) = case delocalise (vs'++vs) e of
+                                Bottom -> Nothing
+                                e' -> Just (Alt cid vs' e' )
+   delocalAlt (AltDef e) = case delocalise vs e of
+                                Bottom -> Nothing
+                                e' -> Just (AltDef e')
+
+deApp :: Expr -> Expr -> Expr
+deApp Bottom _ = Bottom
+deApp _ Bottom = Bottom
+deApp e e' = App e e'
+
+deCase :: Expr -> Expr -> [Alt Expr] -> Expr
+deCase Bottom _ _ = Bottom
+deCase e e' as = case filter ((/=Bottom) . altExpr) as of
+  [] -> e'
+  as' -> Case e e' as' 
 
 data Func =
   Func {_body :: Expr,

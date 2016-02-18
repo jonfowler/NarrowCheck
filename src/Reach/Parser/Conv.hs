@@ -110,10 +110,10 @@ convFunc c (vid, qs) = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (
     fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
-    Func {_body = e,
+    Func {_body = lazify e,
           _vars = c' ^. convertLocals . nextInt
           })
- where s = convExpr (desugar qs) []
+ where s = convExpr (desugar qs) 
 
 aVar :: Pattern -> VarId
 aVar (PatVar x) = x
@@ -123,50 +123,49 @@ convArgs [] = return id
 convArgs (v : vs) = do
   i <- overConv convertLocals v 
   f <- convArgs vs
-  return (flip Expr [] . Lam i . f)
+  return (Lam i . f)
 
 atomise :: Expr -> ConvertM (Expr -> Expr, Atom)
 atomise (Let x e e') = do
   (f , a') <- atomise e'
   return (Let x e . f , a')
-atomise (Expr e []) = return (id, e)
-atomise e = do
-  x <- overConv convertLocals  ""
-  return (Let x e , Var x)
+atomise e | atom e = return (id, e)
+          | otherwise = do
+              x <- overConv convertLocals ""
+              return (Let x e, Var x)
+
+--(Expr e []) = return (id, e)
+--atomise e = do
+--  x <- overConv convertLocals  ""
+--  return (Let x e , Var x)
 
 atomises :: [Expr] -> ConvertM (Expr -> Expr, [Atom])
 atomises es = foldr (\(f , a) (g , as) -> (f . g, a : as)) (id , []) <$> mapM atomise es
  
-convExpr :: PExpr -> [Conts] -> ConvertM Expr
-convExpr (PVar vid) cs = Expr <$> (Var <$> viewConv convertLocals vid) <*> pure cs
-                    <|> Expr <$> (Fun <$> viewConv convertFuncId vid) <*> pure cs
+convExpr :: PExpr -> ConvertM Expr
+convExpr (PVar vid) = (Var <$> viewConv convertLocals vid) 
+                    <|> (Fun <$> viewConv convertFuncId vid) 
                     <|> throwError ("Variable " ++ show vid ++ " is not in local or function names")
-convExpr (PCon cid es) cs = do
-  es' <- mapM (flip convExpr []) es
+convExpr (PCon cid es) = do
+  es' <- mapM convExpr es
   (f, as) <- atomises es'
   c <- viewConv convertCon cid
-  return . f $ Expr (Con c as) cs
-convExpr (PApp f e) cs = do
-  e' <- convExpr e []
-  convExpr f (Apply e' : cs)
-convExpr (PLam v e) cs = do
-  v' <- overConv convertLocals v
-  e' <- convExpr e []
-  return (Expr (Lam v' e') [])
+  return . f $ (Con c as) 
+convExpr (PApp f e) = App <$> convExpr f <*> convExpr e
+convExpr (PLam v e) = Lam <$> overConv convertLocals v <*> convExpr e
   
-convExpr (PParens e) cs = convExpr e cs
-convExpr (PCase e as) cs = do
-  as' <- mapM convAlt as
-  convExpr e (Branch as' : cs)
+convExpr (PParens e) = convExpr e
+convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
+   
 
 
 convAlt :: PAlt PExpr -> ConvertM (Alt Expr)
 convAlt (PAlt (PatCon cid xs)  e) = do
   cs <- viewCons cid
   vs <- mapM (overConv convertLocals) (map aVar xs)
-  e' <- convExpr e []
+  e' <- convExpr e
   return (Alt cs vs e') 
-convAlt (PAlt (PatVar "") e) = AltDef <$> convExpr e []
+convAlt (PAlt (PatVar "") e) = AltDef <$> convExpr e 
 convAlt c = error ("convAlt incomplete patterns: " ++ show c)
 
 overConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int

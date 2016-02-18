@@ -7,14 +7,6 @@ reach = prop_ordDel
 
 --reach x = (s4 <= x) || (s1 <= x)
 
-s1 = S Z
-
-s2 = S s1 
-
-s3 = S s2
-
-s4 = S s3
-
 --all :: (Nat -> Bool) -> Tree ->  Bool
 allle i Leaf = True 
 allle i (Node t1 x t2) = x <= i && allle i t1 && allle i t2

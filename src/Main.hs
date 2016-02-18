@@ -73,13 +73,14 @@ go fn flags = do
   --    fid = env ^. funcIds .at' "reach"
       fal = env ^. constrIds . at' "False"
       rs = runReach (evalSetup "reach" >>= evalStrat) env
+  putStrLn (printDoc (printFuncs env))
   when (output && not refute) (printResults (rights rs))
   when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
   print (length . rights $ rs)
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
       evalStrat = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> evalBase -- evalBase
+        EvalInterweave -> undefined -- evalBase -- evalBase
         EvalBasic -> evalLazy
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
@@ -91,8 +92,8 @@ printResults = mapM_ (\(e,env) -> do {putStrLn (showAtom env e ++ " ->"); printF
 printFVars :: [Int] -> Env -> IO ()
 printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
-runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
-runF fid env = runReach (evalLazy (Fun fid, [])) env
+--runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
+--runF fid env = runReach (evalLazy (Fun fid, [])) env
 
 
 --runF :: FId -> Env -> [(Expr, Env)]

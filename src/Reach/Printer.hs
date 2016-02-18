@@ -2,6 +2,7 @@ module Reach.Printer
   (printExpr,
    printState,
    printDoc,
+   printFuncs,
    putDoc
    )where
 
@@ -32,6 +33,19 @@ printExpr :: Env -> Expr -> Doc
 printExpr s = fst . printExpr' s
 
 printExpr' :: Env -> Expr -> (Doc, Bool)
+printExpr' s (Let v e e') = (text "let" <+> var "v" v
+                                        <+> text "="
+                                        <+> printExpr s e
+                                        <+> text "in"
+                                        <+> printExpr s e'
+                            , True)
+printExpr' s (Case e e' as) = (text "case"
+                                      <+> nest 2 (printExpr s e
+                                      <+>  (text "of" <$>
+                                              (vsep (text ">>>" <+> printExpr s e' : map (printAlt s (printExpr s)) as))))
+                           , True) 
+printExpr' s e@(App _ _) = (bracketer . map (printExpr' s) . reverse . allApps $ e, True)
+
 printExpr' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
 printExpr' s (Var x) = (var "v" x , False)
 printExpr' s (FVar x) = (var "x" x , False)
@@ -41,6 +55,11 @@ printExpr' s (Con cid es) = (text (s ^. constrNames . at' cid)
                             <+> (group . hsep . map (bracket . printExpr' s) $ es)
                             , True)
 printExpr' s (Fun fid) = (text (s ^. funcNames . at' fid), False)
+printExpr' s Bottom = (text "BOT", False)
+
+allApps :: Expr -> [Expr]
+allApps (App e e') = e' : allApps e 
+allApps e = [e]
  
 --printExpr :: Env -> Expr -> Doc
 --printExpr s =  fst . printExpr' s 
@@ -95,6 +114,11 @@ printAlt s p (Alt cid vs e) = text (s ^. constrNames . at' cid)
 --printCont :: Env -> Cont -> Doc
 --printCont s e = printExpr s (toExpr e) 
 --
+
+printFuncs :: Env -> Doc
+printFuncs s = vsep . map printEnv' $ I.toList (s ^. funcs)
+ where printEnv' (x , f) = text (s ^. funcNames . at' x) <+> text "=>" <+> printExpr s (f ^. body) 
+  
 printEnv :: Env -> Doc
 printEnv s = vsep . map printEnv' $ I.toList (s ^. env)
    where printEnv' (x , e) = var "e" x <+> text "=>" <+> printExpr s e

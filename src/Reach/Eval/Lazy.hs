@@ -3,7 +3,6 @@ module Reach.Eval.Lazy where
 import Reach.Eval.Reduce
 import Reach.Eval.Expr
 import Reach.Eval.Monad
-import Reach.Eval.Gen
 import Reach.Eval.Env
 import Reach.Lens
 import Reach.Printer
@@ -11,10 +10,12 @@ import Data.List
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as I
 
+import Debug.Trace       
+
 runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
 runReach m s = runExceptT (runStateT m s)
 
-evalSetup :: Monad m => String -> ReachT m Expr'
+evalSetup :: Monad m => String -> ReachT m Expr
 evalSetup fname = do
   fid' <- use (funcIds . at fname)
   case fid' of
@@ -24,22 +25,24 @@ evalSetup fname = do
       ts <- use (funcArgTypes . at' fid)
       xs <- mapM (fvar 0) ts
       topFrees .= xs
-      (e, cs) <- bindLets fexpr
-      return (foldr (\x (e', cs') -> (e, Apply (atom $ FVar x) : cs')) (e, cs) xs)
+      return (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
 
+reduceFull :: Monad m => Reduce m 
+reduceFull = fix (reduce reduceFull) 
 
-evalLazy :: MonadChoice m => Expr' -> ReachT m Atom
-evalLazy (e, conts) = do
-   c <- fix reduce e conts
+evalLazy :: MonadChoice m => Expr -> ReachT m Atom
+evalLazy e = do
+--   env <- get
+--   trace (printDoc (printState e env)) $ return () 
+   c <- reduceFull e --fix (reduce (const (return (Fin Bottom)))) e
    case c of 
-     Fin (Lam v e) -> do
-        x <- newFVar
-        evalLazy (Lam v e, [Apply . atom . FVar $ x])
+--     Fin (Lam v e) -> do
+--        x <- newFVar
+--        evalLazy (Lam v e, [Apply . atom . FVar $ x])
      Fin a -> return a
-     Susp x (Branch a as : cs) -> do
+     Susp x e -> do
        (cid, xs) <- choose x
-       evalLazy (Con cid (map FVar xs), Branch a as : cs)
-     SuspL v _ -> error "Should not be suspended on local variable in evalLazy"
+       evalLazy e
 
 choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
 choose x = do
@@ -62,9 +65,8 @@ fvar d t = do
   return x
 
 suspToExpr :: Susp -> Expr
-suspToExpr (Fin a) = Expr a []
-suspToExpr (SuspL v cs) = Expr (Var v) cs
-suspToExpr (Susp x cs) = Expr (FVar x) cs
+suspToExpr (Fin a) = a 
+suspToExpr (Susp x e) = e 
 
 
 evar e = do
