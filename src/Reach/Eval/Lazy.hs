@@ -27,22 +27,26 @@ evalSetup fname = do
       topFrees .= xs
       return (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
 
-reduceFull :: Monad m => Reduce m 
-reduceFull = fix (reduce reduceFull) 
-
 evalLazy :: MonadChoice m => Expr -> ReachT m Atom
 evalLazy e = do
---   env <- get
---   trace (printDoc (printState e env)) $ return () 
-   c <- reduceFull e --fix (reduce (const (return (Fin Bottom)))) e
+   c <- fix (reduce (const (return (Fin Bottom)))) e
    case c of 
---     Fin (Lam v e) -> do
---        x <- newFVar
---        evalLazy (Lam v e, [Apply . atom . FVar $ x])
      Fin a -> return a
      Susp x e -> do
        (cid, xs) <- choose x
        evalLazy e
+
+reduceFull :: Monad m => Reduce m 
+reduceFull = fix (reduce reduceFull) 
+
+evalFull :: MonadChoice m => Expr -> ReachT m Atom
+evalFull e = do
+   c <- reduceFull e 
+   case c of 
+     Fin a -> return a
+     Susp x e -> do
+       (cid, xs) <- choose x
+       evalFull e
 
 choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
 choose x = do

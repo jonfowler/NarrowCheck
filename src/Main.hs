@@ -32,7 +32,7 @@ options =
   [ Option ['d'] [] (ReqArg dbound "NUM")
       "data-depth bound",
     Option ['e'] ["eval"] (ReqArg evalType "STRING")
-      "Evaluation type I/B for Interweaving/Basic",
+      "Evaluation type F/B for Full/Basic",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No output",
     Option [] ["refute"] (NoArg Refute)
@@ -42,9 +42,9 @@ options =
           | n >= 0 = DataBound n
           | otherwise = error "DataDepth Bound must be positive"
           where n = read s
-        evalType "I" = EvalType EvalInterweave 
+        evalType "F" = EvalType EvalInterweave 
         evalType "B" = EvalType EvalBasic 
-        evalType "Interweaving" = EvalType EvalInterweave 
+        evalType "Full" = EvalType EvalInterweave 
         evalType "Basic" = EvalType EvalBasic 
         evalType _ = error "unrecognised evaluation type"
 
@@ -80,7 +80,7 @@ go fn flags = do
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
       evalStrat = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> undefined -- evalBase -- evalBase
+        EvalInterweave -> evalFull
         EvalBasic -> evalLazy
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])

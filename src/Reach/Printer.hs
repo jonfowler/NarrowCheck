@@ -110,7 +110,10 @@ printAlt s p (Alt cid vs e) = text (s ^. constrNames . at' cid)
   <+> hsep (map (var "v") vs)
   <+> text "->"
   <+> p e
- 
+printAlt s p (AltDef e) = text "_" 
+  <+> text "->"
+  <+> p e
+
 --printCont :: Env -> Cont -> Doc
 --printCont s e = printExpr s (toExpr e) 
 --

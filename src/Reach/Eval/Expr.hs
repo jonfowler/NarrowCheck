@@ -126,7 +126,7 @@ unify (Con cid []) (Con cid' [])
   | cid == cid' = Con cid []
   | otherwise = Bottom
 unify (Con cid es) (Con cid' es')
-  | cid == cid' = error "just delete this for now"
+--  | cid == cid' = error "just delete this for now"
   | otherwise = Bottom
 unify (Let x e e') _ = Bottom
 unify _ (Let x e e') = Bottom
@@ -146,7 +146,7 @@ delocalise vs (Var v) | v `elem` vs = Var v
                       | otherwise = Bottom
 delocalise vs (Fun f) = Fun f
 delocalise vs (App e e') = deApp (delocalise vs e) (delocalise vs e')
-delocalise vs (Con cid es) = Con cid (map (delocalise vs) es)
+delocalise vs (Con cid es) = deCon cid (map (delocalise vs) es)
 delocalise vs (FVar x) = FVar x
 delocalise vs Bottom = Bottom
 delocalise vs (Case e e' as) = deCase (delocalise vs e) (delocalise vs e') (mapMaybe delocalAlt as)
@@ -162,6 +162,10 @@ deApp :: Expr -> Expr -> Expr
 deApp Bottom _ = Bottom
 deApp _ Bottom = Bottom
 deApp e e' = App e e'
+
+deCon :: CId -> [Expr] -> Expr
+deCon cid es | all (/= Bottom) es = Con cid es
+             | otherwise = Bottom
 
 deCase :: Expr -> Expr -> [Alt Expr] -> Expr
 deCase Bottom _ _ = Bottom
