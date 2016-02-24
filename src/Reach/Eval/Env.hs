@@ -1,5 +1,7 @@
 module Reach.Eval.Env (
   Env(..),
+  Expr'(..),
+  toExpr',
   funcs, funcArgTypes,
   free, nextFVar, freeDepth, freeType, maxDepth, topFrees,
   env, nextEVar, nextLVar, typeConstr,
@@ -15,6 +17,11 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Reach.Lens
 
+data Expr' = Expr' !Expr ![Expr] ![(Expr', [Alts])] deriving Show
+
+toExpr' :: Expr -> Expr'
+toExpr' e = Expr' e [] [] 
+
 data Env = Env {
   _funcs :: IntMap Func,
   _funcArgTypes :: IntMap [Type],
@@ -27,7 +34,7 @@ data Env = Env {
   _maxDepth :: !Int,
   _topFrees :: [FId],
 
-  _env :: IntMap Expr,
+  _env :: IntMap Expr',
   _nextEVar :: !EId,
   _nextLVar :: !LId,
 

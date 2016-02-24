@@ -27,26 +27,48 @@ evalSetup fname = do
       topFrees .= xs
       return (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
 
-evalLazy :: MonadChoice m => Expr -> ReachT m Atom
-evalLazy e = do
-   c <- fix (reduce (const (return (Fin Bottom)))) e
+evalLazy :: MonadChoice m => Expr -> [Expr] -> FullAlts -> ReachT m Atom
+evalLazy e ap br = do
+   c <- fix (reduce (\x e ap br -> return $ Susp x (Expr' e ap br))) e ap br
    case c of 
      Fin a -> return a
-     Susp x e -> do
+     Susp x (Expr' e ap br) -> do
        (cid, xs) <- choose x
-       evalLazy e
+       evalLazy e ap br
 
-reduceFull :: Monad m => Reduce m 
-reduceFull = fix (reduce reduceFull) 
+reduceFull' :: Monad m => FullAlts  -> ReachT m (Either FullAlts Susp)
+reduceFull' [] = return . Left $ [] 
+reduceFull' ((Expr' e' ap' br', ass) : br) = do
+  a <- fix (reduce reduceFull) e' ap' br'
+  case a of
+    Fin Bottom -> case br of
+      [] -> return . Left $ [(Expr' Bottom [] [], ass)]
+      ((z, ass') : br) -> reduceFull' ((z, ass ++ ass') : br)
+    Fin a -> Right <$> fix (reduce reduceFull) a [] br
+    Susp _ z -> do
+      a <- reduceFull' br
+      case a of
+        Left brs -> return . Left $ ((z, ass) : brs)
+        Right s -> return $ Right s
 
-evalFull :: MonadChoice m => Expr -> ReachT m Atom
-evalFull e = do
-   c <- reduceFull e 
+reduceFull :: Monad m => FullReduce m 
+reduceFull x e ap br = do
+  a <- reduceFull' br
+  case a of
+    Left br' -> return . Susp x $ Expr' e ap br'
+    Right s  -> return s
+--reduceFull x e ap ( 
+      
+    
+
+evalFull :: MonadChoice m => Expr -> [Expr] -> FullAlts -> ReachT m Atom
+evalFull e ap br = do
+   c <- fix (reduce reduceFull) e ap br
    case c of 
      Fin a -> return a
-     Susp x e -> do
+     Susp x (Expr' e ap br) -> do
        (cid, xs) <- choose x
-       evalFull e
+       evalFull e ap br
 
 choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
 choose x = do
@@ -68,18 +90,18 @@ fvar d t = do
   freeType . at x ?= t
   return x
 
-suspToExpr :: Susp -> Expr
-suspToExpr (Fin a) = a 
+suspToExpr :: Susp -> Expr'
+suspToExpr (Fin a) = Expr' a [] []
 suspToExpr (Susp x e) = e 
 
-
+evar :: Monad m => Expr' -> ReachT m EId
 evar e = do
   ex <- use nextEVar
   nextEVar += 1
   env . at ex ?= e
   return ex
 
-evars :: Monad m => [Expr] -> ReachT m [EId]
+evars :: Monad m => [Expr'] -> ReachT m [EId]
 evars = mapM evar 
 
 newFVars :: Monad m => Int -> ReachT m [FId]

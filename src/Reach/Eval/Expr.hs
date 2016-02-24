@@ -21,6 +21,8 @@ type Type = Int
 data Alt a = Alt {-# UNPACK #-} !CId [LId] a
            | AltDef a deriving (Show, Functor, Foldable, Traversable, Eq)
 
+type Alts = [Alt Expr]
+
 altExpr :: Alt a -> a                               
 altExpr (Alt _ _ e) = e
 altExpr (AltDef e) = e
@@ -40,7 +42,7 @@ data Expr
   | Lam {-# UNPACK #-} !LId Expr
 
   | Bottom
-  | Case Expr Expr [Alt Expr] 
+  | Case Expr Expr Alts 
   | App Expr Expr
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression

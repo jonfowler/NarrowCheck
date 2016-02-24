@@ -11,67 +11,72 @@ import qualified Data.IntMap as I
 
 import Debug.Trace
 
-type Reduce m = Expr -> ReachT m Susp
+type FullAlts = [(Expr', [Alts])]
+
+type Reduce m = Expr -> [Expr] -> FullAlts -> ReachT m Susp
+type FullReduce m = FId -> Expr -> [Expr] -> FullAlts -> ReachT m Susp 
 --type Expr' = (Atom, [Conts])
 --
-data Susp = Susp FId Expr
+data Susp = Susp FId Expr'
           | Fin Atom deriving Show
 
-reduceTrace :: Monad m => Reduce m -> Reduce m -> Reduce m
-reduceTrace s r e = do
-  env <- get
-  trace (printDoc (printState e env)) $ reduce s r e 
+
+--reduceTrace :: Monad m => Reduce m -> Reduce m -> Reduce m
+--reduceTrace s r e = do
+--  env <- get
+--  trace (printDoc (printState e env)) $ reduce s r e 
 
 
-reduce :: Monad m => Reduce m -> Reduce m -> Reduce m
-reduce s r (Let x e e') = do
-  bind x e
-  r e'
-reduce s r (Lam x e) = return . Fin $ Lam x e
-reduce s r (Con cid es) = return . Fin $ Con cid es
-reduce s r (App (Lam x e') e) = do
-  bind x e
-  r e' 
-reduce s r (App (Con _ _) e) = fail "Type error at runtime" 
-reduce s r (App e e') = do
-  a <- reduce s r e
-  case a of
-    Fin e -> r (App e e')
-    Susp x e -> return $ Susp x (App e e')
-reduce s r (Case (Con cid es) e' as) = do
-  e <- match cid es as
-  r e
-reduce s r (Fun fid) = do
+reduce :: Monad m => FullReduce m -> Reduce m -> Reduce m
+reduce s r (Let x e e') ap br = do
+  bind x (toExpr' e)
+  r e' ap br
+reduce s r (Lam x e) [] [] = return . Fin $ Lam x e
+reduce s r (Lam x e') (e : es) bs = do
+  bind x (toExpr' e)
+  r e' es bs
+reduce s r (App e e') ap br = reduce s r e (e' : ap) br
+
+reduce s r (Con cid es) [] [] = return . Fin $ Con cid es
+reduce s r Bottom _ _ = return $ Fin Bottom
+reduce s r (Con cid es) [] ((_, [as]) : br) = do
+  e <- match cid (toExpr' <$> es) as
+  r e [] br
+reduce s r (Con cid es) [] ((e, as : ass) : br) = do
+  e <- match cid (toExpr' <$> es) as
+  r e [] ((toExpr' e, ass) : br)
+reduce s r (Fun fid) ap br = do
  e <- use (funcs . at' fid) >>= inlineFunc 
- r e 
-reduce s r (Case e e' as) = do
-  a <- reduce s r e
-  case a of
-    Fin c -> r (Case c e' as)
-    Susp x e -> do
-        a <- s e'
-        case a of
-          Fin Bottom -> return $ Susp x (Case e Bottom as)
-          Fin a -> return $ Fin a
-          Susp x' e' -> return $ Susp x (Case e e' as)
+ r e ap br
+reduce s r (Case e Bottom as) [] ((e', ass): br) = reduce s r e [] ((e', as : ass) : br)
+reduce s r (Case e e' as) [] br = reduce s r e [] ((toExpr' e', [as])  : br)
+
+--  a <- reduce s r e
+--  case a of
+--    Fin c -> r (Case c e' as)
+--    Susp x e -> do
+--        a <- s e'
+--        case a of
+--          Fin Bottom -> return $ Susp x (Case e Bottom as)
+--          Fin a -> return $ Fin a
+--          Susp x' e' -> return $ Susp x (Case e e' as)
 --      return $ Susp x (Case e e' as)
 
-reduce s r Bottom = return $ Fin Bottom
-reduce s r (Var v) = do
-  e <- use (env . at' v)
-  a <- r e
+reduce s r (Var v) ap br = do
+  Expr' e ap' br' <- use (env . at' v)
+  a <- r e ap' br'
   case a of
     Fin a -> do
-      env . at v ?= a
-      return (Fin a)
+      env . at v ?= toExpr' a
+      r a ap br
     Susp x e -> do
       env . at v ?= e
-      return (Susp x (Var v))
-reduce s r (FVar x) = do
+      s x (Var v) ap br
+reduce s r (FVar x) ap br = do
   a <- use (free . at x)
   case a of
-    Just (cid, fids) -> return $ Fin (Con cid (FVar <$> fids))
-    Nothing -> return (Susp x (FVar x))
+    Just (cid, fids) -> r (Con cid (FVar <$> fids)) ap br
+    Nothing -> s x (FVar x) ap br
 
 --reduce r (Con cid es) (Branch a as : cs) = do
 --  (e, cs') <- match cid es as >>= bindLets
@@ -104,7 +109,7 @@ inlineFunc (Func e vs) = do
   nextEVar += vs
   return (replaceExpr i e) 
 
-match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
+match :: Monad m => CId -> [Expr'] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)
   | cid == cid' = binds xs es >> return c
   | otherwise   = match cid es as
@@ -113,10 +118,10 @@ match _ _ [] = return Bottom -- error "REACH_ERROR: no match for constructor in 
 
                          
 
-binds :: Monad m => [LId] -> [Expr] -> ReachT m ()
+binds :: Monad m => [LId] -> [Expr'] -> ReachT m ()
 binds vs es = mapM_ (uncurry bind) (zip vs es)
 
-bind :: Monad m => LId -> Expr -> ReachT m ()
+bind :: Monad m => LId -> Expr' -> ReachT m ()
 bind v e = env . at v ?= e
 
 --bindLets :: Monad m => Expr -> ReachT m Expr'

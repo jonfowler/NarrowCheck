@@ -79,9 +79,9 @@ go fn flags = do
   print (length . rights $ rs)
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
-      evalStrat = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> evalFull
-        EvalBasic -> evalLazy
+      evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
+        EvalInterweave -> evalFull e [] []
+        EvalBasic -> evalLazy e [] []
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
 

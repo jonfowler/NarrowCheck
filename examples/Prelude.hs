@@ -14,10 +14,15 @@ Z <= y = True
 S x <= Z = False
 S x <= S y = x <= y
 
-Z < Z = False
-Z < S x = True
-S x < Z = False
-S x < S y = x < y
+x < y = case y of
+  Z -> False 
+  S y' -> case x of
+    Z -> True
+    S x' -> x' < y'
+--Z < Z = False
+--Z < S x = True
+--S x < Z = False
+--S x < S y = x < y
 
 x >= y = y <= x
 

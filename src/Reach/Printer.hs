@@ -1,6 +1,6 @@
 module Reach.Printer
   (printExpr,
-   printState,
+--   printState,
    printDoc,
    printFuncs,
    putDoc
@@ -122,16 +122,16 @@ printFuncs :: Env -> Doc
 printFuncs s = vsep . map printEnv' $ I.toList (s ^. funcs)
  where printEnv' (x , f) = text (s ^. funcNames . at' x) <+> text "=>" <+> printExpr s (f ^. body) 
   
-printEnv :: Env -> Doc
-printEnv s = vsep . map printEnv' $ I.toList (s ^. env)
-   where printEnv' (x , e) = var "e" x <+> text "=>" <+> printExpr s e
+--printEnv :: Env -> Doc
+--printEnv s = vsep . map printEnv' $ I.toList (s ^. env)
+--   where printEnv' (x , e) = var "e" x <+> text "=>" <+> printExpr s e
 
-printState :: Expr -> Env -> Doc
-printState e s = text "EXPR:"
-              <$> printExpr s e
-              <$> text "ENV:"
-              <$> printEnv s
-              <> line <> line
+--printState :: Expr -> Env -> Doc
+--printState e s = text "EXPR:"
+--              <$> printExpr s e
+--              <$> text "ENV:"
+--              <$> printEnv s
+--              <> line <> line
 
 printDoc :: Doc -> String
 printDoc = printSimpleDoc . renderPretty 1 90
