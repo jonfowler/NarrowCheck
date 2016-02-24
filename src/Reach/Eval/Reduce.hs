@@ -43,8 +43,8 @@ reduce s r (Lam x e') (e : ap) br = do
   bind x e
   (a,ap',br') <- bindLets e'
   r a (ap' ++ ap) (br' ++ br)
-reduce s r (Con cid es) [] [] = return . Fin $ Con cid es
 reduce s r Bottom _ _ = return $ Fin Bottom
+reduce s r (Con cid es) [] [] = return . Fin $ Con cid es
 reduce s r (Con cid es) [] ((_, [as]) : br) = do
   (a, ap, br') <- match cid es as >>= bindLets
   r a ap (br' ++ br)
