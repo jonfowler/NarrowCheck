@@ -3,8 +3,9 @@ import qualified Reach.Parser.Module as P
 import qualified Reach.Parser.Conv as C
 import Reach.Eval.Lazy
 import Reach.Eval.Full
-import Reach.Eval.Expr
+--import Reach.Eval.Expr
 import Reach.Eval.Env
+import Reach.Eval.ExprBase
 import Reach.Lens
 import Reach.Eval.Monad
 import Reach.Printer
@@ -72,7 +73,7 @@ go fn flags = do
   let env = C.convModule dataBound m'
   --    fid = env ^. funcIds .at' "reach"
       fal = env ^. constrIds . at' "False"
-      rs = runReach (evalSetup "reach" >>= evalStrat) env
+      rs = runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
   putStrLn (printDoc (printFuncs env))
   when (output && not refute) (printResults (rights rs))
   when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -80,16 +81,16 @@ go fn flags = do
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
       evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> evalFull e [] []
-        EvalBasic -> evalLazy e [] []
+        EvalInterweave -> evalFull e 
+        EvalBasic -> evalLazy e 
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
 
 
-printResults :: [(Atom, Env)] -> IO ()
+printResults :: [(Atom, Env Expr)] -> IO ()
 printResults = mapM_ (\(e,env) -> do {putStrLn (showAtom env e ++ " ->"); printFVars (env ^. topFrees) env})
 
-printFVars :: [Int] -> Env -> IO ()
+printFVars :: [Int] -> Env Expr -> IO ()
 printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
 --runF :: FId -> Env -> [Either ReachFail (Atom, Env)]

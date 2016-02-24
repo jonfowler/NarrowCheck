@@ -5,33 +5,20 @@ module Reach.Eval.Expr where
 import Control.Lens
 import Data.Maybe
 
+import Reach.Eval.ExprBase
 import Control.Monad
 
 import Data.IntMap (IntMap)       
 import qualified Data.IntMap as I
-
-type LId = Int 
-type EId = Int
-type CId = Int 
-type FuncId = Int
-type FId = Int
-type Type = Int
-
-
-data Alt a = Alt {-# UNPACK #-} !CId [LId] a
-           | AltDef a deriving (Show, Functor, Foldable, Traversable, Eq)
-
-type Alts = [Alt Expr]
-
-altExpr :: Alt a -> a                               
-altExpr (Alt _ _ e) = e
-altExpr (AltDef e) = e
 
 --data Conts = Branch Expr [Alt Expr]
 --           | Apply Expr deriving (Show)
 
 data Expr
   = Let !LId Expr Expr
+  | Case Expr Expr [Alt Expr]
+  | App Expr Expr
+
   | Fun {-# UNPACK #-} !FuncId
   -- The "local" variables are variables scoped by lambdas, they
   -- are converted to environment variables when they are bound.
@@ -42,8 +29,6 @@ data Expr
   | Lam {-# UNPACK #-} !LId Expr
 
   | Bottom
-  | Case Expr Expr Alts 
-  | App Expr Expr
   -- A constructors arguments should be atoms: either a variable or
   -- further atoms. This is for efficiency, ensuring every expression
   -- is only evaluated once.
@@ -174,13 +159,6 @@ deCase Bottom _ _ = Bottom
 deCase e e' as = case filter ((/=Bottom) . altExpr) as of
   [] -> e'
   as' -> Case e e' as' 
-
-data Func =
-  Func {_body :: Expr,
-        _vars :: !Int
-       } -- deriving Show
-
-makeLenses ''Func
 
 
 

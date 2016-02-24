@@ -15,8 +15,9 @@ import Control.Applicative
 import Reach.Parser.Desugar
 import Reach.Parser.Module
 import Reach.Parser.PExpr
+import Reach.Eval.ExprBase
 import Reach.Eval.Expr
-import Reach.Eval.Env
+import Reach.Eval.Env hiding (Expr(..), Atom(..), atom) 
 
 data Conv a = Conv
   { _mapToInt :: Map a Int
@@ -61,7 +62,7 @@ setupConvert m = Convert
 setupConv :: Ord a => [a] -> State (Conv a) ()
 setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
-convModule :: Int -> Module -> Env
+convModule :: Int -> Module -> Env Expr
 convModule i m = Env {
              _funcs = I.fromList $ map (convFunc c) (M.toList $ m ^. moduleDef),
              _funcArgTypes = I.fromList $ map (convFuncArg c) (M.toList $ m ^. moduleTypeDef),
@@ -105,7 +106,7 @@ getArgs :: PType -> [TypeId]
 getArgs (Type _) = []
 getArgs (Type tid :-> t) = tid : getArgs t
 
-convFunc :: Convert -> (VarId, [PDef]) -> (FuncId, Func)
+convFunc :: Convert -> (VarId, [PDef]) -> (FuncId, Func Expr)
 convFunc c (vid, qs) = case runExcept . runStateT s $ c of
   Left e -> error e
   Right (e , c') -> (

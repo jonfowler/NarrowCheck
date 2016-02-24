@@ -1,4 +1,3 @@
---{-# LANGUAGE UndecidableInstances #-}
 module Reach.Eval.Monad (
   module X,
   ReachT,
@@ -21,7 +20,7 @@ data ReachFail
   | RecLimitFail
   | ConstraintFail deriving Show
 
-type ReachT m = StateT Env (ExceptT ReachFail m)
+type ReachT m = StateT (Env Expr) (ExceptT ReachFail m)
 
 class (Monad m) => MonadChoice m where
   memp :: m a

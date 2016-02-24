@@ -1,8 +1,9 @@
 module Reach.Eval.Lazy where
 
 import Reach.Eval.Reduce
-import Reach.Eval.Expr
+--import Reach.Eval.Expr
 import Reach.Eval.Monad
+import Reach.Eval.ExprBase
 import Reach.Eval.Env
 import Reach.Lens
 import Reach.Printer
@@ -12,7 +13,7 @@ import qualified Data.IntMap as I
 
 import Debug.Trace       
 
-runReach :: Monad m => ReachT m a -> Env -> m (Either ReachFail (a , Env))
+runReach :: Monad m => ReachT m a -> Env Expr -> m (Either ReachFail (a , Env Expr))
 runReach m s = runExceptT (runStateT m s)
 
 evalSetup :: Monad m => String -> ReachT m Expr
@@ -21,28 +22,29 @@ evalSetup fname = do
   case fid' of
     Nothing -> error "The reach function does not a type"
     Just fid -> do
-      fexpr <- use (funcs . at' fid) >>= inlineFunc 
+      (a, ap, br) <- use (funcs . at' fid) >>= inlineFunc >>= bindLets
       ts <- use (funcArgTypes . at' fid)
       xs <- mapM (fvar 0) ts
       topFrees .= xs
-      return (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
+--      (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
+      return (Expr a ((atom . FVar <$> xs) ++ ap) br)
 
-evalLazy :: MonadChoice m => Expr -> [Expr] -> FullAlts -> ReachT m Atom
-evalLazy e ap br = do
-   c <- fix (reduce (\x e ap br -> return $ Susp x (Expr' e ap br))) e ap br
+evalLazy :: MonadChoice m => Expr -> ReachT m Atom
+evalLazy e = do
+   c <- eval (\x e ap br -> return $ Susp x (Expr e ap br)) e
    case c of 
      Fin a -> return a
-     Susp x (Expr' e ap br) -> do
+     Susp x e -> do
        (cid, xs) <- choose x
-       evalLazy e ap br
+       evalLazy e 
 
 reduceFull' :: Monad m => FullAlts  -> ReachT m (Either FullAlts Susp)
 reduceFull' [] = return . Left $ [] 
-reduceFull' ((Expr' e' ap' br', ass) : br) = do
+reduceFull' ((Expr e' ap' br', ass) : br) = do
   a <- fix (reduce reduceFull) e' ap' br'
   case a of
     Fin Bottom -> case br of
-      [] -> return . Left $ [(Expr' Bottom [] [], ass)]
+      [] -> return . Left $ [(Expr Bottom [] [], ass)]
       ((z, ass') : br) -> reduceFull' ((z, ass ++ ass') : br)
     Fin a -> Right <$> fix (reduce reduceFull) a [] br
     Susp _ z -> do
@@ -55,20 +57,20 @@ reduceFull :: Monad m => FullReduce m
 reduceFull x e ap br = do
   a <- reduceFull' br
   case a of
-    Left br' -> return . Susp x $ Expr' e ap br'
+    Left br' -> return . Susp x $ Expr e ap br'
     Right s  -> return s
 --reduceFull x e ap ( 
       
     
 
-evalFull :: MonadChoice m => Expr -> [Expr] -> FullAlts -> ReachT m Atom
-evalFull e ap br = do
-   c <- fix (reduce reduceFull) e ap br
+evalFull :: MonadChoice m => Expr -> ReachT m Atom
+evalFull e = do
+   c <- eval reduceFull e 
    case c of 
      Fin a -> return a
-     Susp x (Expr' e ap br) -> do
+     Susp x e -> do
        (cid, xs) <- choose x
-       evalFull e ap br
+       evalFull e 
 
 choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
 choose x = do
@@ -90,18 +92,18 @@ fvar d t = do
   freeType . at x ?= t
   return x
 
-suspToExpr :: Susp -> Expr'
-suspToExpr (Fin a) = Expr' a [] []
+suspToExpr :: Susp -> Expr
+suspToExpr (Fin a) = Expr a [] []
 suspToExpr (Susp x e) = e 
 
-evar :: Monad m => Expr' -> ReachT m EId
+evar :: Monad m => Expr -> ReachT m EId
 evar e = do
   ex <- use nextEVar
   nextEVar += 1
   env . at ex ?= e
   return ex
 
-evars :: Monad m => [Expr'] -> ReachT m [EId]
+evars :: Monad m => [Expr] -> ReachT m [EId]
 evars = mapM evar 
 
 newFVars :: Monad m => Int -> ReachT m [FId]

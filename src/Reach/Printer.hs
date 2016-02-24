@@ -11,7 +11,8 @@ import Text.PrettyPrint.Leijen
 
 import Reach.Lens
 import Reach.Eval.Expr
-import Reach.Eval.Env
+import Reach.Eval.ExprBase
+import qualified Reach.Eval.Env as E
 
 import qualified Data.IntMap as I
 
@@ -29,10 +30,10 @@ bracket (d , False) = d
 var :: String -> Int -> Doc
 var s i = text (s ++ show i)
 
-printExpr :: Env -> Expr -> Doc
+printExpr :: E.Env Expr -> Expr -> Doc
 printExpr s = fst . printExpr' s
 
-printExpr' :: Env -> Expr -> (Doc, Bool)
+printExpr' :: E.Env Expr -> Expr -> (Doc, Bool)
 printExpr' s (Let v e e') = (text "let" <+> var "v" v
                                         <+> text "="
                                         <+> printExpr s e
@@ -49,12 +50,12 @@ printExpr' s e@(App _ _) = (bracketer . map (printExpr' s) . reverse . allApps $
 printExpr' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
 printExpr' s (Var x) = (var "v" x , False)
 printExpr' s (FVar x) = (var "x" x , False)
-printExpr' s (Con cid []) = (text (s ^. constrNames . at' cid)
+printExpr' s (Con cid []) = (text (s ^. E.constrNames . at' cid)
                             , False)
-printExpr' s (Con cid es) = (text (s ^. constrNames . at' cid)
+printExpr' s (Con cid es) = (text (s ^. E.constrNames . at' cid)
                             <+> (group . hsep . map (bracket . printExpr' s) $ es)
                             , True)
-printExpr' s (Fun fid) = (text (s ^. funcNames . at' fid), False)
+printExpr' s (Fun fid) = (text (s ^. E.funcNames . at' fid), False)
 printExpr' s Bottom = (text "BOT", False)
 
 allApps :: Expr -> [Expr]
@@ -102,11 +103,11 @@ allApps e = [e]
 --                                (vsep . map (printAlt s (printExpr s))) as)
 --                           , True)
 -- 
-printAlt :: Env -> (a -> Doc) -> Alt a -> Doc
-printAlt s p (Alt cid [] e) = text (s ^. constrNames . at' cid)
+printAlt :: E.Env Expr -> (a -> Doc) -> Alt a -> Doc
+printAlt s p (Alt cid [] e) = text (s ^. E.constrNames . at' cid)
   <+> text "->"
   <+> p e
-printAlt s p (Alt cid vs e) = text (s ^. constrNames . at' cid)
+printAlt s p (Alt cid vs e) = text (s ^. E.constrNames . at' cid)
   <+> hsep (map (var "v") vs)
   <+> text "->"
   <+> p e
@@ -118,9 +119,9 @@ printAlt s p (AltDef e) = text "_"
 --printCont s e = printExpr s (toExpr e) 
 --
 
-printFuncs :: Env -> Doc
-printFuncs s = vsep . map printEnv' $ I.toList (s ^. funcs)
- where printEnv' (x , f) = text (s ^. funcNames . at' x) <+> text "=>" <+> printExpr s (f ^. body) 
+printFuncs :: E.Env Expr -> Doc
+printFuncs s = vsep . map printEnv' $ I.toList (s ^. E.funcs)
+ where printEnv' (x , f) = text (s ^. E.funcNames . at' x) <+> text "=>" <+> printExpr s (f ^. body) 
   
 --printEnv :: Env -> Doc
 --printEnv s = vsep . map printEnv' $ I.toList (s ^. env)
