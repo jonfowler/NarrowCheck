@@ -4,7 +4,7 @@ module Reach.Eval.Reduce where
 import Reach.Eval.Monad
 import Reach.Eval.ExprBase
 import Reach.Eval.Env
-import Reach.Lens
+import Reach.Lens 
 import Reach.Printer
 import Data.List
 import Data.IntMap (IntMap)
@@ -12,24 +12,26 @@ import qualified Data.IntMap as I
 
 import Debug.Trace
 
+
+
 type Reduce m = Atom -> [Expr] -> FullAlts -> ReachT m Susp
 type FullReduce m = FId -> Atom -> [Expr] -> FullAlts -> ReachT m Susp 
 
 data Susp = Susp FId Expr
           | Fin Atom deriving Show
 
+
 bindLets :: Monad m => Expr -> ReachT m (Atom, [Expr], FullAlts)
 bindLets (Let x e e') = do
   bind x e 
   bindLets e'
 bindLets (Expr e ap br) = return (e, ap, br)
-
-
+{-# INLINE bindLets #-}
 
 eval :: Monad m => FullReduce m -> Expr -> ReachT m Susp 
 eval s e = do
   (a, ap, br) <- bindLets e
-  fix (reduce s) a ap br
+  reduce s a ap br
 
 --reduceTrace :: Monad m => Reduce m -> Reduce m -> Reduce m
 --reduceTrace s r e = do
@@ -37,23 +39,23 @@ eval s e = do
 --  trace (printDoc (printState e env)) $ reduce s r e 
 
 
-reduce :: Monad m => FullReduce m -> Reduce m -> Reduce m
-reduce s r (Lam x e) [] [] = return . Fin $ Lam x e
-reduce s r (Lam x e') (e : ap) br = do
+reduce :: Monad m => FullReduce m -> Reduce m
+reduce s (Lam x e) [] [] = return . Fin $ Lam x e
+reduce s (Lam x e') (e : ap) br = do
   bind x e
   (a,ap',br') <- bindLets e'
-  r a (ap' ++ ap) (br' ++ br)
-reduce s r Bottom _ _ = return $ Fin Bottom
-reduce s r (Con cid es) [] [] = return . Fin $ Con cid es
-reduce s r (Con cid es) [] ((_, [as]) : br) = do
+  reduce s a (ap' ++ ap) (br' ++ br)
+reduce s Bottom _ _ = return $ Fin Bottom
+reduce s (Con cid es) [] [] = return . Fin $ Con cid es
+reduce s (Con cid es) [] ((_, [as]) : br) = do
   (a, ap, br') <- match cid es as >>= bindLets
-  r a ap (br' ++ br)
-reduce s r (Con cid es) [] ((z, as : ass) : br) = do
+  reduce s a ap (br' ++ br) 
+reduce s (Con cid es) [] ((z, as : ass) : br) = do
   (a, ap, br') <- match cid es as >>= bindLets
-  r a ap (br' ++ (z, ass) : br)
-reduce s r (Fun fid) ap br = do
- (a, ap', br') <- use (funcs . at' fid) >>= inlineFunc >>= bindLets
- r a (ap' ++ ap) (br' ++ br)
+  reduce s a ap (br' ++ (z, ass) : br)
+reduce s (Fun fid) ap br = do
+ Expr a ap' br' <- use (funcs . at' fid) >>= inlineFunc
+ reduce s a (ap' ++ ap) (br' ++ br)
 --reduce s r (Case e Bottom as) [] ((e', ass): br) = reduce s r e [] ((e', as : ass) : br)
 --reduce s r (Case e e' as) [] br = reduce s r e [] ((toExpr' e', [as])  : br)
 
@@ -68,21 +70,34 @@ reduce s r (Fun fid) ap br = do
 --          Susp x' e' -> return $ Susp x (Case e e' as)
 --      return $ Susp x (Case e e' as)
 
-reduce s r (Var v) ap br = do
-  (e, ap', br') <- use (env . at' v) >>= bindLets
-  a <- r e ap' br'
+reduce s (Var v) ap br = reduceVar s v ap br
+
+
+reduce s (FVar x) ap br = do
+  a <- use (free . at x)
+  case a of
+    Just (cid, fids) -> reduce s (Con cid (FVar <$> fids)) ap br
+    Nothing -> s x (FVar x) ap br
+
+reduceVar :: Monad m => FullReduce m -> LId -> [Expr] -> FullAlts -> ReachT m Susp 
+reduceVar s v ap br = do
+  Expr e ap' br' <- use (env . at' v)
+  a <- reduce s e ap' br'
   case a of
     Fin a -> do
       env . at v ?= atom a
-      r a ap br
+      reduce s a ap br
+    Susp x (Expr (Var v') [] []) -> do
+      env . at v ?= Expr (Var v') [] [] 
+      s x (Var v') ap br
+    Susp _ (Expr (FVar x) [] []) -> do
+      env . at v ?= Expr (FVar x) [] [] 
+      s x (FVar x) ap br
     Susp x e -> do
-      env . at v ?= e
+      env . at v ?= e 
       s x (Var v) ap br
-reduce s r (FVar x) ap br = do
-  a <- use (free . at x)
-  case a of
-    Just (cid, fids) -> r (Con cid (FVar <$> fids)) ap br
-    Nothing -> s x (FVar x) ap br
+{-# INLINE reduceVar #-}
+
 
 --reduce r (Con cid es) (Branch a as : cs) = do
 --  (e, cs') <- match cid es as >>= bindLets
@@ -109,11 +124,14 @@ reduce s r (FVar x) ap br = do
 --    Just (cid, fids) -> r (Con cid (map FVar fids)) cs
 --    Nothing -> return $ Susp x cs
 
+
+
 inlineFunc :: Monad m => Func Expr -> ReachT m Expr
 inlineFunc (Func e vs) = do 
   i <- use nextEVar
   nextEVar += vs
   return (replaceExpr i e) 
+{-# INLINE inlineFunc #-}
 
 match :: Monad m => CId -> [Atom] -> [Alt Expr] -> ReachT m Expr
 match  cid es (Alt cid' xs c : as)

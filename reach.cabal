@@ -24,6 +24,7 @@ executable reach
                        mtl >=2.2.1, 
                        containers == 0.*, 
                        lens == 4.*, 
+                       random == 1.*,
                        wl-pprint == 1.2,
                        parsers == 0.12.3,
                        trifecta == 1.5.2

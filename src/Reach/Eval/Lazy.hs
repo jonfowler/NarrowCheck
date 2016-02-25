@@ -40,13 +40,13 @@ evalLazy e = do
 
 reduceFull' :: Monad m => FullAlts  -> ReachT m (Either FullAlts Susp)
 reduceFull' [] = return . Left $ [] 
-reduceFull' ((Expr e' ap' br', ass) : br) = do
-  a <- fix (reduce reduceFull) e' ap' br'
+reduceFull' ((e, ass) : br) = do
+  a <- eval reduceFull e 
   case a of
     Fin Bottom -> case br of
       [] -> return . Left $ [(Expr Bottom [] [], ass)]
       ((z, ass') : br) -> reduceFull' ((z, ass ++ ass') : br)
-    Fin a -> Right <$> fix (reduce reduceFull) a [] br
+    Fin a -> Right <$> reduce reduceFull a [] br
     Susp _ z -> do
       a <- reduceFull' br
       case a of

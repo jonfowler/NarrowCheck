@@ -24,6 +24,7 @@ import Reach.Lens
 
 type Alts = [Alt Expr]
 type FullAlts = [(Expr, [Alts])]
+--type Expr' = (Atom, [Expr], FullAlts)
 
 data Expr = Expr !Atom ![Expr] !FullAlts
           | Let LId Expr Expr deriving (Show, Eq)

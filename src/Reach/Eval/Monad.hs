@@ -2,8 +2,8 @@ module Reach.Eval.Monad (
   module X,
   ReachT,
   ReachFail(..),
-  mchoice,
-  MonadChoice(..)
+  MonadChoice(..),
+  Tree(..)
   ) where
 
 import Control.Monad.State as X
@@ -22,23 +22,39 @@ data ReachFail
 
 type ReachT m = StateT (Env Expr) (ExceptT ReachFail m)
 
+data Tree a = Leaf a | Branch [Tree a] deriving Functor
+
+instance Applicative Tree where
+  pure = Leaf
+  Leaf f <*> t = f <$> t
+  Branch fs <*> t = Branch $ fmap (<*> t) fs
+
+instance Monad Tree where
+  return = Leaf
+  Leaf a >>= m = m a
+  Branch ts >>= m = Branch $ fmap (>>= m) ts
+
 class (Monad m) => MonadChoice m where
   memp :: m a
-  infixr 4 <|>
-  (<|>) :: m a -> m a -> m a
+--  infixr 4 <|>
+--  (<|>) :: m a -> m a -> m a
+  mchoice :: MonadChoice m => [m a] -> m a
 
-mchoice :: MonadChoice m => [m a] -> m a
-mchoice = foldr (<|>) memp
+
+--mchoice = foldr (<|>) memp
+
+          
 
 instance MonadChoice [] where
   memp = []
-  l1 <|> l2 = l1 ++ l2
+  mchoice = concat 
 
 instance MonadChoice m => MonadChoice (ExceptT e m) where
   memp = lift memp
-  ExceptT l1 <|> ExceptT l2 = ExceptT $ l1 <|> l2 
+  mchoice es = ExceptT $ mchoice (runExceptT <$> es)
+--  ExceptT l1 <|> ExceptT l2 = ExceptT $ l1 <|> l2 
 
 instance MonadChoice m => MonadChoice (StateT e m) where
   memp = lift memp
-  StateT s1 <|> StateT s2 = StateT $ \e -> s1 e <|> s2 e
+  mchoice ss = StateT $ \s -> mchoice (($ s) . runStateT <$> ss)
     

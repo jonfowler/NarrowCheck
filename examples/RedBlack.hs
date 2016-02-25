@@ -82,7 +82,7 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 --False --> _ = True
 --True --> x = x
 
-redBlack t = ord t && black t && red t
+redBlack t = red t && ord t && black t 
 
 -- refute
 prop_insertRB x t = (redBlack t ==> redBlack (insert x t))
