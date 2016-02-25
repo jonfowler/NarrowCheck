@@ -55,10 +55,37 @@ red (T col a x b) = (case isRed col of
 
 data Pair = Pair Bool Nat
 
-black t = case black' t of
-  Pair b n -> b
+countBlack E = Z
+countBlack (T B t1 x t2) = S Z + countBlack t1
+countBlack (T R t1 x t2) = countBlack t1
 
-black' E = Pair True (S Z)
+black E = True
+black (T c t1 x t2) = black t1 && black t2 &&
+                                 (countBlack t1 == countBlack t2)
+
+maxLength E = Z
+maxLength (T c t1 x t2) = max (S (maxLength t1)) (S (maxLength t2))
+
+balanced E = True
+balanced (T c t1 x t2) = balanced t1 && balanced t2 &&
+        (within2 (maxLength t1) (maxLength t2)
+         || within2 (maxLength t2) (maxLength t1))
+
+within2 Z y = True
+within2 (S x) Z = False
+within2 (S x) (S Z) = False
+within2 (S x) (S (S y)) = within2 x y
+
+max Z y = y
+max (S x) Z = S x
+max (S x) (S y) = S (max x y)
+
+--balanced E = True
+--balanced (T c t1 x t2) = 
+--black t = case black' t of
+--  Pair b n -> b
+
+black' E = Pair True Z
 black' (T col a x b) = case black' a of
   Pair b0 n -> case black' b of
     Pair b1 m -> Pair (b0 && b1 && (n == m)) (n + case isRed col of
@@ -82,12 +109,15 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 --False --> _ = True
 --True --> x = x
 
-redBlack t = red t && ord t && black t 
+redBlack t = ord t && black t && red t  && balanced t
 
 -- refute
-prop_insertRB x t = (redBlack t ==> redBlack (insert x t))
+prop_insertRB t = redBlack t
+                     -- ==> redBlack (insert x t))
 
-reach :: Nat -> Tree -> Bool
-reach = prop_insertRB 
+reach :: Tree -> Bool
+reach t = balanced t
+
+  --prop_insertRB 
 
 

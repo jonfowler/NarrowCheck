@@ -79,6 +79,7 @@ choose x = do
   when (maxd <= d) (throwError DataLimitFail)
   t <- use (freeType . at' x)
   as <- use (typeConstr . at' t)
+  when (null as) (error "type constructors should never be empty")
   (cid, ts) <- mchoice (map pure as)
   xs <- mapM (fvar (d + 1)) ts
   free . at x ?= (cid, xs)

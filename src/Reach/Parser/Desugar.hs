@@ -110,6 +110,7 @@ matcher us qs d | isCon (head qs) = do
                     let (cs, qs') = span isCon qs
                     d' <- matcher us qs' d
                     matchCon us (sortBy (compare `on` getCon) cs) d'
+matcher us qs d = error $ "Incomplete pattern match in Desugar/matcher. The head of qs is: " ++ show (head qs)
 
 matchVar :: [VarId] -> [PDef] -> Maybe PExpr -> State VarName (Maybe PExpr)
 matchVar (u:us) qs = matcher us [PDef ps (subst v (PVar u) e) | PDef (PatVar v : ps) e <- qs]
