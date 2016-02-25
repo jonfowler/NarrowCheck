@@ -2,7 +2,7 @@ module Prelude where
 
 --import GHC.Show
 
-data Bool = True | False 
+data Bool = True | False
 
 data Nat = Z | S Nat
 

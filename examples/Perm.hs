@@ -1,8 +1,6 @@
 module Perm where
 
-
-data List = C Nat List
-          | E
+data List = E | C Nat List
 
 length E = Z
 length (C a l) = S (length l)
@@ -19,4 +17,4 @@ notIn n E = True
 notIn n (C n' l) = (n /= n') && notIn n l
 
 reach :: List -> Bool
-reach l = perm s7 l
+reach l = perm s4 l
