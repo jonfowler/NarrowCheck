@@ -1,6 +1,9 @@
 module Perm where
 
-data List = E | C Nat List
+import ReachPrelude
+import Prelude (Show)
+
+data List = E | C Nat List 
 
 length E = Z
 length (C a l) = S (length l)

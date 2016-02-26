@@ -1,4 +1,7 @@
-module RedBlack1 where
+module RedBlack where
+
+import Prelude ()
+import ReachPrelude
 
 -- Red-Black trees in a functional setting, by Okasaki.
 -- (With invariants coded, and a fault injected.)
@@ -68,8 +71,12 @@ maxLength (T c t1 x t2) = max (S (maxLength t1)) (S (maxLength t2))
 
 balanced E = True
 balanced (T c t1 x t2) = balanced t1 && balanced t2 &&
-        (within2 (maxLength t1) (maxLength t2)
-         || within2 (maxLength t2) (maxLength t1))
+        ((div2 (maxLength t1) <= maxLength t2)
+         || (div2 (maxLength t2) <= (maxLength t1)))
+
+div2 Z = Z
+div2 (S Z) = S Z
+div2 (S (S x)) = S (div2 x)
 
 within2 Z y = True
 within2 (S x) Z = False
@@ -109,15 +116,20 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 --False --> _ = True
 --True --> x = x
 
-redBlack t = ord t && black t && red t  && balanced t
+redBlack t = ord t && black t && red t
+             -- && balanced t
 
 -- refute
-prop_insertRB t = redBlack t
-                     -- ==> redBlack (insert x t))
+prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 
-reach :: Tree -> Bool
-reach t = balanced t
+ex1 :: Tree
+ex1 = T B (T B E Z E) Z (T B E Z E)
 
-  --prop_insertRB 
+reach :: Nat -> Tree -> Bool
+reach = prop_insertRB
+
+  --black t ==> balanced t
+
+   
 
 

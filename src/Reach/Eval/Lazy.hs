@@ -13,8 +13,8 @@ import qualified Data.IntMap as I
 
 import Debug.Trace       
 
-runReach :: Monad m => ReachT m a -> Env Expr -> m (Either ReachFail (a , Env Expr))
-runReach m s = runExceptT (runStateT m s)
+runReach :: Monad m => ReachT m a -> Env Expr -> m (Either ReachFail a , Env Expr)
+runReach m = runStateT (runExceptT m)
 
 evalSetup :: Monad m => String -> ReachT m Expr
 evalSetup fname = do
@@ -79,11 +79,20 @@ choose x = do
   when (maxd <= d) (throwError DataLimitFail)
   t <- use (freeType . at' x)
   as <- use (typeConstr . at' t)
-  when (null as) (error "type constructors should never be empty")
-  (cid, ts) <- mchoice (map pure as)
+--  when (null as) (error "type constructors should never be empty")
+--trace (">>>>  " ++ show x ++ " -> " ++ show as) $
+  (cid, ts) <-  mchoice (map pure as)
   xs <- mapM (fvar (d + 1)) ts
   free . at x ?= (cid, xs)
-  return (cid, xs)
+  env <- get
+  return (cid,xs)
+--  trace (printFVars1 (I.keys (env ^. free)) env) $ return (cid, xs)
+
+printFVars1 :: [Int] -> Env Expr -> String
+printFVars1 xs env = concatMap (\x -> show x ++ " -> " ++ printFVar1 env x ++ "\n") xs 
+
+printFVars :: [Int] -> Env Expr -> String
+printFVars xs env = concatMap (\x -> " " ++ printFVar env x) xs 
 
 fvar :: Monad m => Int -> Type -> ReachT m FId
 fvar d t = do

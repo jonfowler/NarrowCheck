@@ -10,7 +10,7 @@ module Reach.Eval.Env (
   free, nextFVar, freeDepth, freeType, maxDepth, topFrees,
   env, nextEVar, nextLVar, typeConstr,
   funcNames, funcIds, constrNames, constrIds,
-  showAtom, printFVar)
+  showAtom, printFVar, printFVar1)
   where
 
 import Reach.Eval.ExprBase
@@ -102,4 +102,9 @@ bracket = foldr (\x s -> " (" ++ x ++ ")" ++ s) ""
 printFVar :: Env Expr -> FId ->  String
 printFVar env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ bracket (map (printFVar env) xs)
+  Nothing -> "_"
+
+printFVar1 :: Env Expr -> FId ->  String
+printFVar1 env x = case env ^. free . at x of
+  Just (cid, xs) -> env ^. constrNames . at' cid ++ (concatMap (\a -> " " ++ show a)  xs)
   Nothing -> "_"

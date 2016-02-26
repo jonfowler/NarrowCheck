@@ -26,6 +26,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Map as M
 import Data.Map (Map)
+import Data.Maybe
 import Data.Foldable
 import Control.Lens
 import Control.Applicative
@@ -123,7 +124,7 @@ conToType (_, ts) tid = foldr (:->) (Type tid) ts
 parserOfModule :: Parser (Except String Module)
 parserOfModule = do
   nam <- whitespace >> parseModuleHead <|> return []
-  imps <- many parseImport
+  imps <- catMaybes <$> many parseImport
   (execStateT <$> parseModule' <*> pure (emptyModule nam imps)) <* eof
    where parseModule' = sequence_ <$> many (
                    addData <$> try parseData

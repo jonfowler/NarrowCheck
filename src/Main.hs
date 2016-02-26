@@ -27,6 +27,7 @@ data Flag
   | EvalType EvalTypes
   | NoOutput
   | Refute
+  | ShowFunctions
 
 options :: [OptDescr Flag]
 options =
@@ -37,7 +38,9 @@ options =
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No output",
     Option [] ["refute"] (NoArg Refute)
-      "Refute expression"
+      "Refute expression",
+    Option [] ["functions"] (NoArg ShowFunctions)
+      "Show 'compiled' functions"
   ]
   where dbound s 
           | n >= 0 = DataBound n
@@ -66,16 +69,17 @@ go :: FilePath -> [Flag] -> IO ()
 go fn flags = do
   rf <- readFile fn
   m <- P.parseModule rf
-  let fns = map toFileName $ ["Prelude"] : m ^. P.moduleImports
+  let fns = map toFileName $ m ^. P.moduleImports
   ms <- mapM (readFile >=> P.parseModule) fns
   m' <- P.mergeModules m ms
   P.checkModule m'
   let env = C.convModule dataBound m'
   --    fid = env ^. funcIds .at' "reach"
       fal = env ^. constrIds . at' "False"
-      rs = runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
-  putStrLn (printDoc (printFuncs env))
+      rs = pullfst <$> runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
+  when showfuncs $ putStrLn (printDoc (printFuncs env))
   when (output && not refute) (printResults (rights rs))
+--  printAll rs
   when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
   print (length . rights $ rs)
     where
@@ -83,15 +87,31 @@ go fn flags = do
       evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
         EvalInterweave -> evalFull e 
         EvalBasic -> evalLazy e 
+      showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
 
+pullfst :: (Either a b, c) -> Either (a, c) (b, c)
+pullfst (Left a, c) = Left (a , c)
+pullfst (Right b, c) = Right (b , c)
+
 
 printResults :: [(Atom, Env Expr)] -> IO ()
-printResults = mapM_ (\(e,env) -> do {putStrLn (showAtom env e ++ " ->"); printFVars (env ^. topFrees) env})
+printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printFVars (env ^. topFrees) env))
 
-printFVars :: [Int] -> Env Expr -> IO ()
-printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
+printFail :: [(ReachFail, Env Expr)] -> IO ()
+printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env))
+
+--printAll = mapM_ (\e -> case e of
+--           Left (e, env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env)
+--           Right (e, env) -> putStrLn (showAtom env e ++ " ->" ++ printFVars (env ^. topFrees) env))
+
+                                
+
+
+
+--printFVars :: [Int] -> Env Expr -> IO ()
+--printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
 --runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
 --runF fid env = runReach (evalLazy (Fun fid, [])) env

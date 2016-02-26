@@ -30,17 +30,28 @@ import Control.Lens
 --makeLenses ''TypeDef
 
 parseData :: Parser PData
-parseData = try (top "data") >> (tuple
-      <$> (strictIndent >> parseTypeId)
-      <*> (res "=" >> sepBy1 (strictIndent >> parseCon parseType) (res "|")))
+parseData = do
+  try (top "data")
+  strictIndent
+  tid <- parseTypeId
+  res "="
+  ds <-sepBy1 (strictIndent >> parseCon parseType) (res "|")
+  optional (res "deriving" >> many (strictIndent >> anyChar) >> whitespace)
+  return (tid, ds)
 
 parseModuleHead :: Parser [String]            
 parseModuleHead = try (top "module") >> parseModuleName <* lexeme (string "where")
 
-parseImport :: Parser [String]
-parseImport = try (top "import") >>
-              strictIndent >>
-              parseModuleName
+parseImport :: Parser (Maybe [String])
+parseImport = do
+  try (top "import") 
+  strictIndent 
+  n <- parseModuleName
+  o <- optional (between (res "(") (res ")") (many (notChar ')')))
+  case o of
+    Nothing -> return (Just n)
+    Just _ -> return Nothing
+    
               
 
 parseModuleName :: Parser [String]

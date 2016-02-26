@@ -54,7 +54,7 @@ reduce s (Con cid es) [] ((z, as : ass) : br) = do
   (a, ap, br') <- match cid es as >>= bindLets
   reduce s a ap (br' ++ (z, ass) : br)
 reduce s (Fun fid) ap br = do
- Expr a ap' br' <- use (funcs . at' fid) >>= inlineFunc
+ (a, ap', br') <- use (funcs . at' fid) >>= inlineFunc >>= bindLets
  reduce s a (ap' ++ ap) (br' ++ br)
 --reduce s r (Case e Bottom as) [] ((e', ass): br) = reduce s r e [] ((e', as : ass) : br)
 --reduce s r (Case e e' as) [] br = reduce s r e [] ((toExpr' e', [as])  : br)
@@ -81,7 +81,7 @@ reduce s (FVar x) ap br = do
 
 reduceVar :: Monad m => FullReduce m -> LId -> [Expr] -> FullAlts -> ReachT m Susp 
 reduceVar s v ap br = do
-  Expr e ap' br' <- use (env . at' v)
+  (e, ap', br') <- use (env . at' v) >>= bindLets
   a <- reduce s e ap' br'
   case a of
     Fin a -> do
