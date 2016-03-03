@@ -7,7 +7,7 @@ module Reach.Eval.Env (
   atom,
   toExpr,
   funcs, funcArgTypes,
-  free, nextFVar, freeDepth, freeType, maxDepth, topFrees,
+  free, nextFVar, freeDepth, freeType, maxDepth, topFrees, freeCount, maxFreeCount,
   env, nextEVar, nextLVar, typeConstr,
   funcNames, funcIds, constrNames, constrIds,
   showAtom, printFVar, printFVar1)
@@ -73,7 +73,10 @@ data Env a = Env {
   _freeDepth :: IntMap Int,
   _freeType :: IntMap Type,
 
+  _freeCount :: Int,
+
   _maxDepth :: !Int,
+  _maxFreeCount :: Int,
   _topFrees :: [FId],
 
   _env :: IntMap a,

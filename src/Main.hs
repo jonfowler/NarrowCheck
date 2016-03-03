@@ -9,6 +9,8 @@ import Reach.Eval.ExprBase
 import Reach.Lens
 import Reach.Eval.Monad
 import Reach.Printer
+import Reach.Eval.Generate
+import System.Random
       
 import Control.Monad.Except
 
@@ -24,6 +26,7 @@ data EvalTypes = EvalInterweave
 
 data Flag 
   = DataBound Int
+  | ConstBound Int
   | EvalType EvalTypes
   | NoOutput
   | Refute
@@ -33,6 +36,8 @@ options :: [OptDescr Flag]
 options =
   [ Option ['d'] [] (ReqArg dbound "NUM")
       "data-depth bound",
+    Option ['c'] [] (ReqArg cbound "NUM")
+      "data-depth bound",
     Option ['e'] ["eval"] (ReqArg evalType "STRING")
       "Evaluation type F/B for Full/Basic",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
@@ -41,9 +46,14 @@ options =
       "Refute expression",
     Option [] ["functions"] (NoArg ShowFunctions)
       "Show 'compiled' functions"
+
   ]
   where dbound s 
           | n >= 0 = DataBound n
+          | otherwise = error "DataDepth Bound must be positive"
+          where n = read s
+        cbound s 
+          | n >= 0 = ConstBound n
           | otherwise = error "DataDepth Bound must be positive"
           where n = read s
         evalType "F" = EvalType EvalInterweave 
@@ -73,23 +83,38 @@ go fn flags = do
   ms <- mapM (readFile >=> P.parseModule) fns
   m' <- P.mergeModules m ms
   P.checkModule m'
-  let env = C.convModule dataBound m'
-  --    fid = env ^. funcIds .at' "reach"
+  r <- getStdGen
+  let env = C.convModule constBound dataBound m'
       fal = env ^. constrIds . at' "False"
-      rs = pullfst <$> runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
+      tr = env ^. constrIds . at' "True"
+--      rs = pullfst <$> runStrat env
+      gs = evalState (generating 1 (getSol tr)
+                     (runStrat env))
+                     r
   when showfuncs $ putStrLn (printDoc (printFuncs env))
-  when (output && not refute) (printResults (rights rs))
+  when output $ printResults (take 100 gs)
+  print (length (take 100 gs))
+--  when (output && not refute) (printResults (rights rs))
 --  printAll rs
-  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
-  print (length . rights $ rs)
+--  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
+--  print (length . rights $ rs)
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
+      constBound = fromMaybe 10000 (listToMaybe [n | ConstBound n <- flags])
+      evalStrat :: MonadChoice m => Expr -> ReachT m Atom 
       evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
         EvalInterweave -> evalFull e 
         EvalBasic -> evalLazy e 
+--      runStrat :: MonadChoice m => Env Expr -> m (Either ReachFail Atom, Env Expr)
+      runStrat env = runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
+      getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
+      getSol _ _ = Nothing
+
+
+--      (either (const Nothing) (\(Con cid _) -> cid == tr ) . fst)
 
 pullfst :: (Either a b, c) -> Either (a, c) (b, c)
 pullfst (Left a, c) = Left (a , c)

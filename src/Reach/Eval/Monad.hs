@@ -3,7 +3,7 @@ module Reach.Eval.Monad (
   ReachT,
   ReachFail(..),
   MonadChoice(..),
-  mchoice,
+  nullT,
   Tree(..)
   ) where
 
@@ -35,29 +35,33 @@ instance Monad Tree where
   Leaf a >>= m = m a
   Branch ts >>= m = Branch $ fmap (>>= m) ts
 
+nullT :: Tree a -> Bool
+nullT (Branch []) = True
+nullT _ = False
+
 class (Monad m) => MonadChoice m where
   memp :: m a
 --  infixr 4 <|>
-  (<|>) :: m a -> m a -> m a
+--  (<|>) :: m a -> m a -> m a
+--  mchoice = foldr (<|>) memp
+  mchoice :: MonadChoice m => [m a] -> m a
 
-
-mchoice :: MonadChoice m => [m a] -> m a
-mchoice = foldr (<|>) memp
-
-          
+instance MonadChoice Tree where          
+  memp = Branch [] 
+  mchoice ts = Branch ts 
 
 instance MonadChoice [] where
   memp = []
-  (<|>) = (++)
---  mchoice = concat 
+--  (<|>) = (++)
+  mchoice = concat 
 
 instance MonadChoice m => MonadChoice (ExceptT e m) where
   memp = lift memp
---  mchoice es = ExceptT $ mchoice (runExceptT <$> es)
-  ExceptT l1 <|> ExceptT l2 = ExceptT $ l1 <|> l2 
+  mchoice es = ExceptT $ mchoice (runExceptT <$> es)
+--  ExceptT l1 <|> ExceptT l2 = ExceptT $ l1 <|> l2 
 
 instance MonadChoice m => MonadChoice (StateT e m) where
   memp = lift memp
---  mchoice ss = StateT $ \s -> mchoice (($ s) . runStateT <$> ss)
-  StateT s1 <|> StateT s2 = StateT $ \s -> s1 s <|> s2 s
+  mchoice ss = StateT $ \s -> mchoice (($ s) . runStateT <$> ss)
+--  StateT s1 <|> StateT s2 = StateT $ \s -> s1 s <|> s2 s
     

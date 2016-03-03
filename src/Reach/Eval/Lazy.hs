@@ -76,6 +76,10 @@ choose :: MonadChoice m => FId -> ReachT m (CId, [FId])
 choose x = do
   d <- use (freeDepth . at' x)
   maxd <- use maxDepth
+  c <- use freeCount
+  freeCount += 1
+  maxc <- use maxFreeCount
+  when (maxc < c) (throwError DataLimitFail)
   when (maxd <= d) (throwError DataLimitFail)
   t <- use (freeType . at' x)
   as <- use (typeConstr . at' t)

@@ -62,8 +62,8 @@ setupConvert m = Convert
 setupConv :: Ord a => [a] -> State (Conv a) ()
 setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
-convModule :: Int -> Module -> Env Expr
-convModule i m = Env {
+convModule :: Int -> Int -> Module -> Env Expr
+convModule d i m = Env {
              _funcs = I.fromList $ map (convFunc c) (M.toList $ m ^. moduleDef),
              _funcArgTypes = I.fromList $ map (convFuncArg c) (M.toList $ m ^. moduleTypeDef),
 
@@ -71,7 +71,9 @@ convModule i m = Env {
              _nextFVar = 0,
              _freeDepth = I.empty,
              _freeType = I.empty,
+             _freeCount = 0,
 
+             _maxFreeCount = d,
              _maxDepth = i,
              _topFrees = [],
 
