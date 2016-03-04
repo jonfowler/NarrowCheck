@@ -27,6 +27,7 @@ data EvalTypes = EvalInterweave
 data Flag 
   = DataBound Int
   | ConstBound Int
+  | GenNum Int
   | EvalType EvalTypes
   | NoOutput
   | Refute
@@ -40,6 +41,8 @@ options =
       "data-depth bound",
     Option ['e'] ["eval"] (ReqArg evalType "STRING")
       "Evaluation type F/B for Full/Basic",
+    Option ['g'] ["generate"] (ReqArg gen "NUM")
+      "Number of solutions to generate", 
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No output",
     Option [] ["refute"] (NoArg Refute)
@@ -55,6 +58,10 @@ options =
         cbound s 
           | n >= 0 = ConstBound n
           | otherwise = error "DataDepth Bound must be positive"
+          where n = read s
+        gen s
+          | n >= 0 = GenNum n
+          | otherwise = error "Generation number must be postiive"
           where n = read s
         evalType "F" = EvalType EvalInterweave 
         evalType "B" = EvalType EvalBasic 
@@ -92,8 +99,8 @@ go fn flags = do
                      (runStrat env))
                      r
   when showfuncs $ putStrLn (printDoc (printFuncs env))
-  when output $ printResults (take 100 gs)
-  print (length (take 100 gs))
+  when output $ printResults (take genNum gs)
+  unless output $ print (length (take 100 gs))
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -101,6 +108,7 @@ go fn flags = do
     where
       dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
       constBound = fromMaybe 10000 (listToMaybe [n | ConstBound n <- flags])
+      genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       evalStrat :: MonadChoice m => Expr -> ReachT m Atom 
       evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
         EvalInterweave -> evalFull e 

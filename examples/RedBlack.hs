@@ -116,7 +116,7 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 --False --> _ = True
 --True --> x = x
 
-redBlack t =  black t && red t
+redBlack t =  black t && red t && ord t
 --              && balanced t
 -- ord t &&
 
