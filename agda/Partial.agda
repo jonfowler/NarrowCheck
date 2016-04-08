@@ -33,13 +33,18 @@ record Lang : Set₁ where
   field
     T : Term 
     eval : Eval T
-    ⌜_⌝ : Observe T
+    obs : Observe T
     
-open Lang
+
+    
+--open Lang
 
 data ObsOrd {X Y : Ty → Set}(LE : ∀{t} → X t → Obs Y t → Set) : {t : Ty} → Obs X t → Obs Y t → Set where
   Z≤ : ObsOrd LE Z Z
   S≤ : ∀{e e'} → ObsOrd LE e e' → ObsOrd LE (S e) (S e')
-  susp≤ : ∀{t}{x : X t}{e : Obs Y t} → LE x e → ObsOrd LE (oth x) e
+  oth≤ : ∀{t}{x : X t}{e : Obs Y t} → LE x e → ObsOrd LE (oth x) e
+  
+Monotonic : {T : Term} → Eval T → Observe T → Set
+Monotonic eval obs = {!!}
   
 
