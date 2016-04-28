@@ -25,7 +25,7 @@ infix 3 _∈_
 data Term (Γ : Cxt) : Ty → Set where
   Z : Term Γ Nat 
   S : Term Γ Nat → Term Γ Nat 
-  bot : ∀{t} → Term Γ t
+--  bot : ∀{t} → Term Γ t
   ƛ : ∀{u t} → (e : Term (Γ , u) t) → Term Γ (u →ₜ t)
   case : ∀{t} → (e : Term Γ Nat) → (e' : Term Γ t) → (e'' : Term Γ (Nat →ₜ t)) → Term Γ t
 
@@ -35,7 +35,7 @@ data Term (Γ : Cxt) : Ty → Set where
 data Val (Γ : Cxt) : Ty → Set where
   Z : Val Γ Nat 
   S : (Val Γ Nat) → Val Γ Nat 
-  bot : ∀{t} → Val Γ t
+--  bot : ∀{t} → Val Γ t
   ƛ : ∀{u t} → (e : Term (Γ , u) t) → Val Γ (u →ₜ t)
  
 data Inp : Cxt → Set where
@@ -52,7 +52,7 @@ extend' f (there x) = there (f x)
 _*'_ : ∀ {Γ Γ′ : Cxt} {τ} → Ren Γ Γ′ → Term Γ τ → Term Γ′ τ
 r *' Z = Z
 r *' S e = S (r *' e)
-r *' bot = bot
+--r *' bot = bot
 r *' ƛ e = ƛ (extend' r *' e)
 r *' case e e₁ e₂ = case (r *' e) (r *' e₁) (r *' e₂)
 r *' var v = var (r v)
@@ -69,7 +69,7 @@ extend θ (there x) = there *' θ x
 _*_ : ∀ {Γ Γ′ : Cxt} {τ} → Sub Γ Γ′ → Term Γ τ → Term Γ′ τ
 f * Z = Z
 f * S e = S (f * e)
-f * bot = bot
+--f * bot = bot
 f * ƛ e = ƛ (extend f * e)
 f * case e e₁ e₂ = case (f * e) (f * e₁) (f * e₂)
 f * var v = f v
@@ -87,23 +87,23 @@ data _↦_ {Γ : Cxt}{t : Ty} : Term Γ t → Term Γ t → Set where
            → case e e₁ e₂ ↦ case e' e₁ e₂
   caseZ : ∀{e₁ e₂} → case Z e₁ e₂ ↦ e₁
   caseS : ∀{eₛ e₁ e₂} → case (S eₛ) e₁ e₂ ↦ app e₂ eₛ
-  casebot : ∀{e₁ e₂} → case bot e₁ e₂ ↦ bot
+--  casebot : ∀{e₁ e₂} → case bot e₁ e₂ ↦ bot
   appL : ∀{u}{e e' : Term Γ (u →ₜ t)} → e ↦ e' → ∀{e''}  
            → app e e'' ↦ app e' e'' 
   app : ∀{u}{e : Term (Γ , u) t}{e' : Term Γ u} → app (ƛ e) e' ↦ e ⟨ e' ⟩
-  appbot : ∀{u}{e' : Term Γ u} → app bot e' ↦ bot
+--  appbot : ∀{u}{e' : Term Γ u} → app bot e' ↦ bot
   
 data _⇓ {Γ : Cxt} : {t : Ty} → Term Γ t → Set where
   Z : Z ⇓ 
   S : ∀{e} → (e ⇓) → S e ⇓
-  bot : ∀{t} → _⇓ {t = t} bot 
+--  bot : ∀{t} → _⇓ {t = t} bot 
   ƛ : ∀{u t}{e : Term (Γ , u) t} → ƛ e ⇓ 
   red : ∀{t e e'} → _↦_ {t = t} e e' → e' ⇓ → e ⇓ 
   
 evalVal : ∀{Γ t} {e : Term Γ t} → e ⇓ → Val Γ t
 evalVal Z = Z
 evalVal (S x) = S (evalVal x)
-evalVal bot = bot
+--evalVal bot = bot
 evalVal {e = ƛ e} ƛ = ƛ e
 evalVal (red x re) = evalVal re
 
@@ -142,14 +142,14 @@ extendRef eq (there v) = cong (λ x → there *' x) (eq v)
 sub-refl : ∀{Γ t} → (e : Term Γ t) → (f : Sub Γ Γ) → SubRefl f → f * e ≡ e
 sub-refl Z f r = refl
 sub-refl (S e) f r = cong S (sub-refl e f r)
-sub-refl bot f r = refl
+--sub-refl bot f r = refl
 sub-refl (ƛ e) f r = cong ƛ (sub-refl e (extend f) (extendRef r))
 sub-refl (case e e₁ e₂) f r = cong₃ case (sub-refl e f r) (sub-refl e₁ f r) (sub-refl e₂ f r)
 sub-refl (var v) f r = r v
 sub-refl (app e e₁) f r = cong₂ app (sub-refl e f r) (sub-refl e₁ f r)
 
 push-SN : ∀{t}{e e' : Term ε t} → e ↦ e' → WN t e → WN t e'
-push-SN r (r* , wn') = {!red!} , {!!}
+push-SN r (r* , wn') = {!!} , {!!}
 
 pull-SN : ∀{t}{e e' : Term ε t} → e ↦ e' → WN t e' → WN t e
 pull-SN {Nat} r (r* , wn') = red r r* , tt
@@ -159,14 +159,22 @@ Inp-SN : (Γ : Cxt) → Inp Γ → Set
 Inp-SN ε ε = ⊤
 Inp-SN (Γ , t) (σ , e) = Inp-SN Γ σ × (Inp-SN Γ σ → WN t (e [ σ ])) 
 
+
+
 SN : ∀ {Γ} t {σ : Inp Γ} → (e : Term Γ t) → Inp-SN Γ σ → WN t (e [ σ ])
 SN .Nat Z is = Z , tt
 SN .Nat (S e) is with SN Nat e is 
 ...| r , a = S r , tt
-SN Nat bot is = bot , tt
-SN (t →ₜ t₁) {σ} bot is = {!!} -- bot , (λ e' _ → let z = SN {ε} t₁ {ε} (app (bot [ σ ]) e') tt in 
+--SN Nat bot is = bot , tt
+--SN (t →ₜ t₁) {σ} bot is = {!!} -- bot , (λ e' _ → let z = SN {ε} t₁ {ε} (app (bot [ σ ]) e') tt in 
 --         subst (λ x → WN t₁ x) (sub-refl (app bot e') (subInp ε) (sub-refl-ε (subInp ε))) z)
-SN (t →ₜ t₁) {σ} (ƛ e) is = {!!} -- ƛ , λ e' wn → subst (λ x → WN t₁ x) (sub-refl (app (ƛ e [ σ ]) e') (subInp ε) (sub-refl-ε (subInp ε))) (SN t₁ (app (ƛ e [ σ ]) e') tt)
+SN (t →ₜ t₁) {σ} (ƛ e) is = ƛ , (λ e' x → let ih = SN t₁ {(σ , {!e'!})} e (is , {!!}) in {!!})
+
+--with SN t₁ {(σ , {!!})} e (is , {!!}) 
+--...| c = {!!} 
+
+
+-- ƛ , λ e' wn → subst (λ x → WN t₁ x) (sub-refl (app (ƛ e [ σ ]) e') (subInp ε) (sub-refl-ε (subInp ε))) (SN t₁ (app (ƛ e [ σ ]) e') tt)
 SN Nat (case e e₁ e₂) is = {!!} , {!!}
 SN (t →ₜ t₁) (case e e₁ e₂) is = {!!}
 SN {ε} t (var ()) is
