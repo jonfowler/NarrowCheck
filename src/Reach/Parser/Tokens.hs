@@ -85,7 +85,10 @@ reserved :: String -> Parser String
 reserved x = lexeme (string x)
 
 whitespace :: Parser ()
-whitespace = skipMany (void (oneOf " \n") <|> void comment <|> void commentBlock)
+whitespace = skipMany $ void (oneOf " \n")
+                     <|> void comment
+                     <|> void commentBlock
+
 
 comment :: Parser String 
 comment = try (string "--") >> many (notChar '\n')

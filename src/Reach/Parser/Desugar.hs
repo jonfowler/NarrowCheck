@@ -23,7 +23,8 @@ deOp :: PExpr -> PExpr
 deOp e = evalState (deOp' e) 0
 
 deOp' :: PExpr -> State Int PExpr
-deOp' (PCase e as) = PCase <$> deOp' e <*> mapM deOp'Alt as
+deOp' (PCase e as e') =
+  PCase <$> deOp' e <*> mapM deOp'Alt as <*> traverse deOp' e' 
    where deOp'Alt (PAlt p e) = PAlt p <$> deOp' e
 deOp' (PApp e e')  = PApp <$> deOp' e <*> deOp' e'
 deOp' (PCon cid []) = return $ PCon cid []
@@ -46,7 +47,7 @@ data Bunch = Bunch ConId [([Pattern], PExpr)]
            | BunchVar VarId PExpr
       
 partial :: PExpr -> PExpr
-partial (PCase e as) = PCase (partial e) (map partialAlt as)
+partial (PCase e as e') = PCase (partial e) (map partialAlt as) (fmap partial e')
     where partialAlt (PAlt c e) = PAlt c (partial e)
 partial (PApp e e') = case partial e of
   PCon cid es -> PCon cid (es ++ [partial e'])
@@ -71,7 +72,9 @@ elemPatt v (PatVar v') = v == v'
 elemPatt v (PatCon _ ps) = any (elemPatt v) ps
 
 subst :: VarId -> PExpr -> PExpr -> PExpr
-subst v e (PCase e' as) = PCase (subst v e e') (map substAlt as)
+subst v e (PCase e' as e'') = PCase (subst v e e')
+                                    (map substAlt as)
+                                    (fmap (subst v e) e'')
     where substAlt (PAlt p e'') | v `elemPatt` p = PAlt p e
                                 | otherwise = PAlt p (subst v e e'')
 subst v e (PApp e' e'') = PApp (subst v e e') (subst v e e'')
@@ -118,7 +121,7 @@ matchVar (u:us) qs = matcher us [PDef ps (subst v (PVar u) e) | PDef (PatVar v :
 matchCon :: [VarId] -> [PDef] -> Maybe PExpr -> State VarName (Maybe PExpr)
 matchCon (u : us) qs d = do
    as <- mapM (matchAlt us d ) (groupBy ((==) `on` getCon) qs)
-   return (Just $ PCase (PVar u) (as ++ defAlt))
+   return (Just $ PCase (PVar u) (as ++ defAlt) Nothing)
      where defAlt = maybe [] ((:[]) . PAlt (PatVar "")) d 
    
 matchAlt :: [VarId] -> Maybe PExpr -> [PDef] -> State VarName (PAlt PExpr)

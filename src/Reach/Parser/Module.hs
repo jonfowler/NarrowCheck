@@ -188,7 +188,7 @@ checkScopeDef m d = do
   checkScopeExp m locals (d ^. defBody)
 
 checkScopeExp :: Module -> Map VarId () -> PExpr -> Except String ()
-checkScopeExp m locals (PCase e as) = checkScopeExp m locals e <||>
+checkScopeExp m locals (PCase e as _) = checkScopeExp m locals e <||>
    sequence_ (checkScopeAlt m locals <$> as)
 checkScopeExp m locals (PApp e e') = checkScopeExp m locals e <||> checkScopeExp m locals e'
 checkScopeExp m locals (PVar vid) = checkScope m locals vid
