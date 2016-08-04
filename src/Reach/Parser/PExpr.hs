@@ -10,8 +10,8 @@ type TypeId = String
 data PExpr
   -- The following constructors are the "core" constructors, they are used for
   -- parsing and then PExpr are converted to only use these types
-  = PCase PExpr [PAlt PExpr] (Maybe PExpr)
-  | PApp PExpr PExpr
+  = PApp PExpr PExpr
+--  | PCase PExpr [PAlt PExpr] (Maybe PExpr)
   | PCon ConId [PExpr]
   | PVar VarId
   | PLam VarId PExpr
@@ -34,7 +34,7 @@ getPatCon :: Pattern -> ConId
 getPatCon (PatCon c ps) = c
 
 
-data PDef = PDef {_defArgs :: [Pattern], _defBody :: PExpr, _defOverlap :: Bool} deriving (Show)
+data PDef = PDef {_defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 --data PDef = PDef {_defName :: VarId, _defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 makeLenses ''PDef
 

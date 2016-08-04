@@ -25,9 +25,13 @@ import Text.Trifecta.Combinators
 import Text.Trifecta.Delta
 import qualified Text.Trifecta.Parser as T
 
+import Data.Char
 import Reach.Parser.PExpr
 import Reach.Parser.Indent
+
+import Control.Monad.Writer
 import Control.Monad
+
 
 -- Reserved with strict indent, primarily used once in the body of an expression
 res :: String -> Parser String 
@@ -87,11 +91,27 @@ reserved x = lexeme (string x)
 whitespace :: Parser ()
 whitespace = skipMany $ void (oneOf " \n")
                      <|> void comment
+                     <|> void pragma
                      <|> void commentBlock
 
+pragma :: Parser String
+pragma = try $ do
+  string "{-#"
+  many $ oneOf " \n"
+  stringCase "OVERLAP"
+  many $ oneOf " \n"
+  x <- notReserved <|> (char '('  *> notReservedOp <* char ')')
+  many $ oneOf " \n"
+  tell $ [Overlap x]
+  return x
+
+
+charCase c = char (toUpper c) <|> char (toLower c)
+
+stringCase s = foldr (\c m -> (:) <$> charCase c <*> m) (pure []) s
 
 comment :: Parser String 
-comment = try (string "--") >> many (notChar '\n')
+comment = try (string "--") >> many (notChar '\n') 
 
 commentBlock :: Parser String 
 commentBlock = try (string "{-") >> manyTill anyChar (try (string "-}"))

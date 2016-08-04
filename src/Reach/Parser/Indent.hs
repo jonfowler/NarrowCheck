@@ -7,6 +7,7 @@ module Reach.Parser.Indent (
   thisstrictIndent,
   sameIndent,
   getColumn,
+  Pragma(..),
   Parser
   ) where
 
@@ -21,19 +22,23 @@ import qualified Text.Trifecta.Parser as T
 import Data.Int
 import Control.Monad.State
 import Control.Monad.Identity
+import Control.Monad.Writer
 import Reach.Lens
 
 data ParseState = ParseState {_indentLevel :: Int64 }
 makeLenses ''ParseState
+
+data Pragma = Overlap String 
                   
-type Parser a = StateT ParseState T.Parser a   --ParsecT String ParseState Identity a
+type Parser = WriterT [Pragma] (StateT ParseState T.Parser)    --ParsecT String ParseState Identity a
 --type ParserT m a =    ParsecT String ParseState m a
 
-runParse :: Parser a -> String -> Result a
-runParse p = fmap fst . T.parseString (runStateT p startState) mempty
+runParse :: Parser a -> String -> Result (a, [Pragma])
+runParse p = fmap fst . T.parseString (runStateT (runWriterT p) startState) mempty
 
 startState :: ParseState
-startState = ParseState {_indentLevel = 0}
+startState =
+  ParseState {_indentLevel = 0}
 
 --writeIndent :: Int -> ParseState -> ParseState
 --writeIndent n (ParseState _) = ParseState n
@@ -56,7 +61,7 @@ getColumn :: Parser Int64
 getColumn = column <$> position 
 
 guardParse :: String -> Bool -> Parser ()
-guardParse err b = if b then return () else lift . raiseErr $ failed err 
+guardParse err b = if b then return () else lift . lift . raiseErr $ failed err 
 
 thisstrictIndent :: Parser ()
 thisstrictIndent = do
@@ -64,7 +69,7 @@ thisstrictIndent = do
   c <- getColumn
   if i < c 
     then return ()
-    else lift . raiseErr $ failed "this strictindent"
+    else lift . lift . raiseErr $ failed "this strictindent"
 
 
 

@@ -22,6 +22,7 @@ import Reach.Parser.Tokens
 import Reach.Parser.Parse 
 import Reach.Parser.PExpr
 
+import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.State
 import qualified Data.Map as M
@@ -35,7 +36,7 @@ data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
    _moduleData :: Map TypeId [(ConId,[PType])],
-   _moduleDef :: Map VarId [PDef],  
+   _moduleDef :: Map VarId ([PDef], Bool),  
    _moduleTypeDef :: Map VarId PType,
    _moduleCon :: Map ConId [PType]
   } deriving (Show)
@@ -88,7 +89,7 @@ addImport i = moduleImports %= (i:)
 --
 addDef :: (VarId, PDef) -> StateT Module (Except String) ()
 addDef (vid, d) = 
-  moduleDef . at vid %= Just . maybe [d] (++ [d])
+  moduleDef . at vid %= Just . maybe ([d], False) (first (++ [d]))
 --  a <- use (moduleDef . at vid)
 --  case a of
 --    Just _ -> throwError $ "Variable " ++ vid ++ " already defined\n"
@@ -131,12 +132,18 @@ parserOfModule = do
                <|> addDef <$> try parseDef
                <|> addTypeDef <$> parseTypeDef)
 
+addOverlaps :: [Pragma] -> Module -> Module  
+addOverlaps p m = foldr addOverlap m p
+
+addOverlap :: Pragma -> Module -> Module  
+addOverlap (Overlap p) m = moduleDef . ix p . _2 .~ True $ m
+
 parseModule :: Monad m => String -> m Module
 parseModule s = case runParse parserOfModule s of
   Failure err -> fail . show $ err
-  Success m -> case runExcept m of 
+  Success (m, ps) -> case runExcept m of 
     Left err -> fail err
-    Right m -> return m
+    Right m -> return (addOverlaps ps m)
 
 checkModule :: Monad m => Module -> m ()
 checkModule m = case runExcept (checkTypeDefs m >> checkScopes m) of
@@ -180,7 +187,7 @@ checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
   Nothing -> throwError $ "Type " ++ tid ++ " not in scope\n"
 
 checkScopes :: Module -> Except String ()
-checkScopes m = mapMOf_ (moduleDef . folded . folded) (checkScopeDef m) m 
+checkScopes m = mapMOf_ (moduleDef . folded . _1 . folded) (checkScopeDef m) m 
 
 checkScopeDef :: Module -> PDef -> Except String ()
 checkScopeDef m d = do
@@ -188,8 +195,8 @@ checkScopeDef m d = do
   checkScopeExp m locals (d ^. defBody)
 
 checkScopeExp :: Module -> Map VarId () -> PExpr -> Except String ()
-checkScopeExp m locals (PCase e as _) = checkScopeExp m locals e <||>
-   sequence_ (checkScopeAlt m locals <$> as)
+--checkScopeExp m locals (PCase e as _) = checkScopeExp m locals e <||>
+--   sequence_ (checkScopeAlt m locals <$> as)
 checkScopeExp m locals (PApp e e') = checkScopeExp m locals e <||> checkScopeExp m locals e'
 checkScopeExp m locals (PVar vid) = checkScope m locals vid
 checkScopeExp m locals (PCon cid es) = mapM_ (checkScopeExp m locals) es 

@@ -81,13 +81,13 @@ parseDefOp = do
   o <- parseOpId 
   strictIndent
   v' <- parseInnerPattern 
-  return (\e -> (o , PDef [v,v'] e False))
+  return (\e -> (o , PDef [v,v'] e))
 
 parseDefVar :: Parser (PExpr -> (VarId, PDef))
 parseDefVar = do
   v <- parseVarId
   ps <- many (strictIndent >> parsePattern)
-  return (\e -> (v, PDef ps e False))
+  return (\e -> (v, PDef ps e))
 
 parseDef :: Parser (VarId, PDef)
 parseDef = do
@@ -110,11 +110,13 @@ parseExpr :: Parser PExpr
 parseExpr = ($ id) <$> parseExpr'  
 
 parseExpr' ::  Parser ((PExpr -> PExpr) -> PExpr)
-parseExpr' = chainl1' (parseCase <|> parseApp) parseOp 
+parseExpr' = chainl1' (parseApp) parseOp 
 
-parseCase :: Parser PExpr            
-parseCase = PCase <$> (try (res "case") *> parseExpr)
-                 <*> (res "of" *> block parseAlt) <*> return Nothing
+-- parseCase <|>              
+
+--parseCase :: Parser PExpr            
+--parseCase = PCase <$> (try (res "case") *> parseExpr)
+--                 <*> (res "of" *> block parseAlt) <*> return Nothing
 
 chainl1' :: Alternative m => m a -> m (a -> a -> a) -> m ((a -> a) -> a)
 chainl1' p op = scan where
@@ -140,7 +142,7 @@ parseParens :: Parser PExpr
 parseParens = between (res "(") (res ")") $
               PParens . sortParens <$> (
                  (Left <$> do
-                     e <- try (parseCase <|> parseApp)
+                     e <- try parseApp
                      b <- optional $ do
                        o <- strictIndent >> parseOpId
                        es <- optional parseExpr' 
@@ -149,24 +151,22 @@ parseParens = between (res "(") (res ")") $
                  )
               <|> Right <$> do
                     o <- strictIndent >> parseOpId
-                    e <- optional (parseCase <|> parseApp)
+                    e <- optional parseApp
                     return (o,e)
                     )
                      
-parseOverlap :: Parser VarId
-parseOverlap = string  
+--parseOverlap :: Parser VarId
+--parseOverlap = do
+--  string "{-#"
+--  many (oneOf " \n")
+--  string "OVERLAP"
+--  x <- parseVarId <|> (char '(' *> parseOpId <* char ')' )
+--  manyTill anyChar (try (string "#-}"))
+----  justPragma
+--  return x
 
-parsePragma :: Parser a -> Parser a
-parsePragma p = do
-  string "{-#"
-  many (oneOf " \n")
-  x <- manyTill anyChar (try string "#-}")
-  manyTill anyChar (try (string "#-}"))
-  justPragma
-  return x
-
-justPragma :: Parser ()
-justPragma = void $ manyTill anyChar (try string "{-#")
+--justPragma :: Parser ()
+--justPragma = void $ manyTill anyChar (try string "{-#")
   
 sortParens :: Either (PExpr, Maybe (OpId, Maybe ((PExpr -> PExpr) -> PExpr)))
                      (OpId, Maybe PExpr)
