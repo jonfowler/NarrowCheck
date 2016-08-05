@@ -30,6 +30,9 @@ data PAlt a = PAlt Pattern a deriving (Show, Functor)
 data Pattern = PatVar VarId
              | PatCon ConId [Pattern] deriving (Show)
 
+getPatVar :: Pattern -> VarId
+getPatVar (PatVar x) = x
+
 getPatCon :: Pattern -> ConId
 getPatCon (PatCon c ps) = c
 

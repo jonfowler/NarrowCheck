@@ -15,9 +15,9 @@ import Control.Applicative
 import Reach.Parser.Desugar
 import Reach.Parser.Module
 import Reach.Parser.PExpr
-import Reach.Eval.ExprBase
-import Reach.Eval.Expr
-import Reach.Eval.Env hiding (Expr(..), Atom(..), atom) 
+
+import Reach.Eval.Expr       
+import Reach.Eval.Env
 
 data Conv a = Conv
   { _mapToInt :: Map a Int
@@ -64,8 +64,8 @@ setupConv as = foldM_ (\_ v -> overConv id v) 0 as
                      
 convModule :: Int -> Int -> Module -> Env Expr
 convModule d i m = Env {
-             _funcs = I.fromList $ map (convFunc c) (M.toList $ m ^. moduleDef),
-             _funcArgTypes = I.fromList $ map (convFuncArg c) (M.toList $ m ^. moduleTypeDef),
+             _defs = I.fromList $ map (convDef c) (M.toList $ m ^. moduleDef),
+             _defArgTypes = I.fromList $ map (convDefArg c) (M.toList $ m ^. moduleTypeDef),
 
              _free = I.empty,
              _nextFVar = 0,
@@ -78,7 +78,7 @@ convModule d i m = Env {
              _topFrees = [],
 
              _env = I.empty,
-             _nextEVar = 0,
+ --            _nextEVar = 0,
              _nextLVar = -1,
 
              _funcNames = c ^. convertFuncId . mapFromInt,
@@ -95,8 +95,8 @@ convData c (tid, cs) = (c ^. convertTypes . mapToInt . at' tid, map convConType 
    where convConType (cid, ts) = (c ^. convertCon . mapToInt . at' cid,
                                   map (convType c . simpleType) ts)
 
-convFuncArg :: Convert -> (VarId, PType) -> (FuncId, [Type])
-convFuncArg c (vid, t) = (c ^. convertFuncId . mapToInt .at' vid, map (convType c) (getArgs t))
+convDefArg :: Convert -> (VarId, PType) -> (FId, [Type])
+convDefArg c (vid, t) = (c ^. convertFuncId . mapToInt .at' vid, map (convType c) (getArgs t))
 
 convType :: Convert -> TypeId -> Type
 convType c tid = c ^. convertTypes . mapToInt . at' tid
@@ -108,18 +108,30 @@ getArgs :: PType -> [TypeId]
 getArgs (Type _) = []
 getArgs (Type tid :-> t) = tid : getArgs t
 
-convFunc :: Convert -> (VarId, [PDef]) -> (FuncId, Func Expr)
-convFunc c (vid, qs) = case runExcept . runStateT s $ c of
+convDef :: Convert -> (VarId, ([PDef], Bool)) -> (FId, ([Int], Def))
+convDef c (vid, (pds, b)) = case runExcept . runStateT newd $ c of
   Left e -> error e
-  Right (e , c') -> (
-    fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
-    Func {_body = lazify e,
-          _vars = c' ^. convertLocals . nextInt
-          })
- where s = convExpr (desugar qs) 
+  Right (d, _) -> (
+     fromMaybe (error "Function not found") $ c ^. convertFuncId . mapToInt . at vid, 
+     d)
+  where newd | b = convOverlapDef pds
+             | otherwise = convOrderedDef pds
 
-aVar :: Pattern -> VarId
-aVar (PatVar x) = x
+convOverlapDef :: [PDef] -> ConvertM ([Int], Def)
+convOverlapDef = undefined
+
+convOrderedDef :: [PDef] -> ConvertM ([Int], Def)
+convOrderedDef = undefined
+
+--convFunc :: Convert -> (VarId, [PDef]) -> (FId, Def)
+--convFunc c (vid, qs) = case runExcept . runStateT s $ c of
+--  Left e -> error e
+--  Right (e , c') -> (
+--    fromMaybe (error "Function not found") (c' ^. convertFuncId . mapToInt . at vid) ,
+--    Func {_body = lazify e,
+--          _vars = c' ^. convertLocals . nextInt
+--          })
+-- where s = convExpr (desugar qs) 
 
 convArgs :: [VarId] -> ConvertM (Expr -> Expr)
 convArgs [] = return id
@@ -144,6 +156,17 @@ atomise e | atom e = return (id, e)
 
 atomises :: [Expr] -> ConvertM (Expr -> Expr, [Atom])
 atomises es = foldr (\(f , a) (g , as) -> (f . g, a : as)) (id , []) <$> mapM atomise es
+
+usedVars :: Expr -> [Int]
+usedVars = I.keys . usedVars'
+
+usedVars' :: Expr -> I.IntMap ()              
+usedVars' (App e e') = I.union (usedVars' e) (usedVars' e')
+usedVars' (Let v e e') = I.delete v (I.union (usedVars' e) (usedVars' e'))
+usedVars' (Var v) = I.singleton v ()
+usedVars' (Lam v e) = I.delete v (usedVars' e)
+usedVars' (Con c es) = foldr (\e vs -> I.union (usedVars' e) vs) I.empty es
+usedVars' _ = I.empty
  
 convExpr :: PExpr -> ConvertM Expr
 convExpr (PVar vid) = (Var <$> viewConv convertLocals vid) 
@@ -158,18 +181,17 @@ convExpr (PApp f e) = App <$> convExpr f <*> convExpr e
 convExpr (PLam v e) = Lam <$> overConv convertLocals v <*> convExpr e
   
 convExpr (PParens e) = convExpr e
-convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
+--convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
    
 
-
-convAlt :: PAlt PExpr -> ConvertM (Alt Expr)
-convAlt (PAlt (PatCon cid xs)  e) = do
-  cs <- viewCons cid
-  vs <- mapM (overConv convertLocals) (map aVar xs)
-  e' <- convExpr e
-  return (Alt cs vs e') 
-convAlt (PAlt (PatVar "") e) = AltDef <$> convExpr e 
-convAlt c = error ("convAlt incomplete patterns: " ++ show c)
+--convAlt :: PAlt PExpr -> ConvertM (Alt Expr)
+--convAlt (PAlt (PatCon cid xs)  e) = do
+--  cs <- viewCons cid
+--  vs <- mapM (overConv convertLocals) (map aVar xs)
+--  e' <- convExpr e
+--  return (Alt cs vs e') 
+--convAlt (PAlt (PatVar "") e) = AltDef <$> convExpr e 
+--convAlt c = error ("convAlt incomplete patterns: " ++ show c)
 
 overConv :: (MonadState s m, Ord a) => Simple Lens s (Conv a) -> a -> m Int
 overConv l a = do
