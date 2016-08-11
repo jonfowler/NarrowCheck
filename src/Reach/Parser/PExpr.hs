@@ -27,8 +27,11 @@ data PExpr
      
 data PAlt a = PAlt Pattern a deriving (Show, Functor)
 
-data Pattern = PatVar VarId
-             | PatCon ConId [Pattern] deriving (Show)
+data Pattern' a b = PatCon a [Pattern' a b]
+                  | PatVar b 
+                  deriving (Eq, Ord, Show)
+
+type Pattern = Pattern' ConId VarId
 
 getPatVar :: Pattern -> VarId
 getPatVar (PatVar x) = x

@@ -5,10 +5,13 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
+import Data.List (sortBy)
+import Data.Function (on)
 
 import Reach.Lens
 import Control.Monad.State
 import Control.Monad.Except
+import Control.Arrow
 
 import Control.Applicative
 
@@ -49,6 +52,9 @@ viewConv f vid = do
 viewCons :: ConId -> ConvertM Int
 viewCons cid = viewConv convertCon cid
                      <|> throwError ("Constructor " ++ show cid ++ " does not exist")
+
+convCon :: Convert -> VarId -> CId
+convCon c cid = fromMaybe (error "Internal: convCon fail") $ M.lookup cid (c ^. convertCon . mapToInt)
 
 setupConvert :: Module -> Convert 
 setupConvert m = Convert
@@ -114,11 +120,90 @@ convDef c (vid, (pds, b)) = case runExcept . runStateT newd $ c of
   Right (d, _) -> (
      fromMaybe (error "Function not found") $ c ^. convertFuncId . mapToInt . at vid, 
      d)
-  where newd | b = convOverlapDef pds
+  where newd | b = undefined -- convOverlapDef pds
              | otherwise = convOrderedDef pds
 
-convOverlapDef :: [PDef] -> ConvertM ([Int], Def)
-convOverlapDef = undefined
+--collectFst :: [([Pattern], (PExpr, Convert))] ->   
+
+--convPatterns :: [([Pattern], (PExpr, Convert))] -> [([CPattern], Expr)]
+--convPatterns ps | emptyPs ps = either (error "blah") (map (\(a,_) -> ([],a)) ) $
+--   sequence (map (\(_, (e , c)) -> runExcept . runStateT (convExpr e) $ c) ps)
+
+--group :: Eq a => [(Pattern' a b, c)] -> [(,[c])]
+--group [( = 
+
+maxPattern :: [Pattern] -> Int
+maxPattern = maximum . map varPattern
+
+data BackBone a = Node a (IntMap [BackBone a])
+
+bb (Node a _) = a
+
+convertCons :: Convert -> Pattern' ConId a -> Pattern' CId a
+convertCons c p' = mapPattern1 (convCon c) p'
+
+mapPattern1 :: (a->b) -> Pattern' a c -> Pattern' b c
+mapPattern1 f (PatVar a) = PatVar a 
+mapPattern1 f (PatCon cid ps) = PatCon (f cid) (map (mapPattern1 f) ps)
+
+patternName :: Pattern' CId VarId -> BackBone Int -> State Convert (Pattern' CId LId)
+patternName (PatVar a) (Node i _) = do
+   cid <- overConv convertLocals a
+   convertLocals . nextInt += i - 1
+   return $ PatVar cid 
+patternName (PatCon cid ps) (Node i b) = do 
+   convertLocals . nextInt += 1 
+   cl <- use (convertLocals . nextInt)
+   ps' <- patternNames ps (fromMaybe (error "Internal: backbone incorrect") $ I.lookup cid b)
+   convertLocals . nextInt .= cl + i - 1
+   return (PatCon cid ps')
+
+patternNames :: [Pattern' CId VarId] -> [BackBone Int] -> State Convert [Pattern' CId LId]
+patternNames  = zipWithM patternName
+
+leadVars :: [BackBone Int] -> [LId]
+leadVars [] = []
+leadVars (Node i _ : bs) = 0 : map (+i) (leadVars bs)
+
+backbone :: [[Pattern' Int a]] -> [BackBone Int]                
+backbone = map (backboner . backboneBasic)  
+   where
+     backboner :: BackBone () -> BackBone Int
+     backboner (Node _ bs) = Node (maximum (map ((1+) . sum . map bb) $ I.elems bs')) bs'
+        where bs' = I.map (map backboner) bs
+     backboneBasic :: [Pattern' Int a] -> BackBone ()
+     backboneBasic [] = Node () (I.empty)
+     backboneBasic (PatVar _ : ps) = backboneBasic ps
+
+     backboneBasic (PatCon c ps : qs) = undefined
+     backboneBasic' :: Pattern' Int a -> BackBone ()
+     backboneBasic' (PatVar _)  = Node () (I.empty)
+     backboneBasic' (PatCon c ps) = Node () (I.singleton c (map backboneBasic' ps))
+     
+     intersectBB :: BackBone () -> BackBone () -> BackBone ()
+     intersectBB (Node _ b) (Node _ b') = Node () (I.unionWith (zipWith intersectBB) b b')
+
+varPattern :: Pattern -> Int
+varPattern (PatVar a) = 1
+varPattern (PatCon _ ps) = sum . map varPattern $ ps 
+
+emptyPs :: [([Pattern' a b], c)] -> Bool
+emptyPs (([],_) : _) = True
+empryPs _ = False
+
+type CPattern = Pattern' CId LId
+
+groupDefs :: [([CPattern], Expr)] -> [(CId, [([CPattern], Expr)])]                
+groupDefs = undefined
+
+convOverlapDef :: [([CPattern], Expr)] -> Def
+convOverlapDef (([], e) : _) = Result (usedVars e, e)
+convOverlapDef ps | all (isPatVar . head . fst) ps = convOverlapDef (map (first tail) ps)
+--  where ps' = sortBy (compare `on` (head . fst)) ps
+
+isPatVar :: Pattern' a b -> Bool
+isPatVar (PatVar _) = True
+isPatVar _ = False
 
 convOrderedDef :: [PDef] -> ConvertM ([Int], Def)
 convOrderedDef = undefined
