@@ -33,10 +33,10 @@ data Pattern' a b = PatCon a [Pattern' a b]
 
 type Pattern = Pattern' ConId VarId
 
-getPatVar :: Pattern -> VarId
+getPatVar :: Pattern' a b -> b
 getPatVar (PatVar x) = x
 
-getPatCon :: Pattern -> ConId
+getPatCon :: Pattern' a b -> a
 getPatCon (PatCon c ps) = c
 
 

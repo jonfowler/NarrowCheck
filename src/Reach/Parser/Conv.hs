@@ -5,7 +5,7 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
-import Data.List (sortBy)
+import Data.List (sort, sortBy)
 import Data.Function (on)
 
 import Reach.Lens
@@ -115,22 +115,25 @@ getArgs (Type _) = []
 getArgs (Type tid :-> t) = tid : getArgs t
 
 convDef :: Convert -> (VarId, ([PDef], Bool)) -> (FId, ([Int], Def))
-convDef c (vid, (pds, b)) = case runExcept . runStateT newd $ c of
-  Left e -> error e
-  Right (d, _) -> (
-     fromMaybe (error "Function not found") $ c ^. convertFuncId . mapToInt . at vid, 
-     d)
-  where newd | b = undefined -- convOverlapDef pds
-             | otherwise = convOrderedDef pds
+convDef c (vid, (pds, b)) = ( fromMaybe (error "Function not found")
+                                   $ c ^. convertFuncId . mapToInt . at vid,
+                            ( lvs
+                            , convOverlapDef lvs cps ))
+    where lvs = leadVars bckb 
+          bckb = backbone $ map fst ps 
+          ps = map ((map (convertCons c) . _defArgs) &&& _defBody)  pds
+          cps = map (convPDef c bckb) ps 
+                            
 
---collectFst :: [([Pattern], (PExpr, Convert))] ->   
-
---convPatterns :: [([Pattern], (PExpr, Convert))] -> [([CPattern], Expr)]
---convPatterns ps | emptyPs ps = either (error "blah") (map (\(a,_) -> ([],a)) ) $
---   sequence (map (\(_, (e , c)) -> runExcept . runStateT (convExpr e) $ c) ps)
-
---group :: Eq a => [(Pattern' a b, c)] -> [(,[c])]
---group [( = 
+          
+--  case runExcept . runStateT newd $ c of
+--  Left e -> error e
+--  Right (d, _) -> (
+--     fromMaybe (error "Function not found") $ c ^. convertFuncId . mapToInt . at vid, 
+--     d)
+--  where newd | b = undefined -- convOverlapDef pds
+--             | otherwise = convOrderedDef pds
+         
 
 maxPattern :: [Pattern] -> Int
 maxPattern = maximum . map varPattern
@@ -146,20 +149,29 @@ mapPattern1 :: (a->b) -> Pattern' a c -> Pattern' b c
 mapPattern1 f (PatVar a) = PatVar a 
 mapPattern1 f (PatCon cid ps) = PatCon (f cid) (map (mapPattern1 f) ps)
 
-patternName :: Pattern' CId VarId -> BackBone Int -> State Convert (Pattern' CId LId)
+patternName :: Pattern' CId VarId -> BackBone Int -> State Convert CPattern 
 patternName (PatVar a) (Node i _) = do
    cid <- overConv convertLocals a
    convertLocals . nextInt += i - 1
    return $ PatVar cid 
 patternName (PatCon cid ps) (Node i b) = do 
-   convertLocals . nextInt += 1 
    cl <- use (convertLocals . nextInt)
-   ps' <- patternNames ps (fromMaybe (error "Internal: backbone incorrect") $ I.lookup cid b)
-   convertLocals . nextInt .= cl + i - 1
-   return (PatCon cid ps')
+   convertLocals . nextInt += 1 
+   let bs = fromMaybe (error "Internal: backbone incorrect") $ I.lookup cid b
+   ps' <- patternNames ps bs 
+   convertLocals . nextInt .= cl + i 
+   return (PatCon (cid, map (+cl) $ leadVars bs) ps')
 
-patternNames :: [Pattern' CId VarId] -> [BackBone Int] -> State Convert [Pattern' CId LId]
+patternNames :: [Pattern' CId VarId] -> [BackBone Int] -> State Convert [CPattern]
 patternNames  = zipWithM patternName
+
+convPDef :: Convert -> [BackBone Int] -> ([Pattern' CId VarId], PExpr) -> ([CPattern], Expr)
+convPDef c b (ps, e) = (ps' , e') 
+  where (ps' , c') = runState (patternNames ps b) $ c 
+        e' = case runExcept . runStateT (convExpr e) $ c' of
+               Left e -> error e
+               Right (ne,_) -> ne
+
 
 leadVars :: [BackBone Int] -> [LId]
 leadVars [] = []
@@ -191,21 +203,35 @@ emptyPs :: [([Pattern' a b], c)] -> Bool
 emptyPs (([],_) : _) = True
 empryPs _ = False
 
-type CPattern = Pattern' CId LId
+type CPattern = Pattern' (CId, [Int]) LId
 
-groupDefs :: [([CPattern], Expr)] -> [(CId, [([CPattern], Expr)])]                
-groupDefs = undefined
+groupDefs :: [([CPattern], Expr)] -> ([(CId, [Int], [([CPattern], Expr)])],
+                                      Maybe (LId, [([CPattern],Expr)]))
+groupDefs [] = ([],Nothing)
+groupDefs xs@(((PatCon (cid, is) _ : _), e) : _) = first ((cid, is, map getPEs ys):) $ groupDefs ys'
+    where (ys, ys') = span (\(x:_,_) -> not (isPatVar x) && cid == getPatVar x) xs 
+          getPEs (PatCon _ cps : cps', e)  = (cps ++ cps', e)
+groupDefs ((PatVar vid : cps, e) : xs) = second 
+                             (maybe (Just (vid,[(cps, e)])) $ \(vid,es) -> Just (vid, (cps,e):es))
+                             $ groupDefs xs
 
-convOverlapDef :: [([CPattern], Expr)] -> Def
-convOverlapDef (([], e) : _) = Result (usedVars e, e)
-convOverlapDef ps | all (isPatVar . head . fst) ps = convOverlapDef (map (first tail) ps)
+convOverlapDef :: [Int] -> [([CPattern], Expr)] -> Def
+convOverlapDef is ps = convOverlapDef' is $ sortBy (compare `on` fst) ps
+
+convOverlapDef' :: [Int] -> [([CPattern], Expr)] -> Def
+convOverlapDef' _ (([], e) : _) = Result (usedVars e) e
+convOverlapDef' (_ : is) ps | all (isPatVar . head . fst) ps = convOverlapDef is (map (first tail) ps)
+convOverlapDef' (i : is) ps = case groupDefs ps of
+  (alts, ol) -> Match i (toAlt <$> alts) (convOverlapDef is . snd <$> ol)
+     where toAlt (cid, is', ps') = Alt cid is' $ convOverlapDef (is' ++ is) ps'
+
 --  where ps' = sortBy (compare `on` (head . fst)) ps
 
 isPatVar :: Pattern' a b -> Bool
 isPatVar (PatVar _) = True
 isPatVar _ = False
 
-convOrderedDef :: [PDef] -> ConvertM ([Int], Def)
+convOrderedDef :: [Int] -> [([CPattern], Expr)] -> Def
 convOrderedDef = undefined
 
 --convFunc :: Convert -> (VarId, [PDef]) -> (FId, Def)

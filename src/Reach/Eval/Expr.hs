@@ -21,8 +21,8 @@ data Expr
 
 type Atom = Expr
 
-data Def = Match [(Int, [Alt])]
-         | Result ([Int], Expr)
+data Def = Match Int [Alt] !(Maybe Def)
+         | Result [Int] Expr
 
 data Alt = Alt CId [Int] Def
          | AltDef Def
