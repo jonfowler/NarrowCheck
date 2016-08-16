@@ -102,6 +102,9 @@ makeLenses ''Env
 bracket :: [String] -> String
 bracket = foldr (\x s -> " (" ++ x ++ ")" ++ s) ""
 
+showAtom :: Env Expr -> Expr -> String
+showAtom env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showAtom env) es)
+showAtom _ e = "Can't show non constructor value: " ++ show e
 
 printXVar :: Env Expr -> XId ->  String
 printXVar env x = case env ^. free . at x of
@@ -112,3 +115,12 @@ printXVar1 :: Env Expr -> FId ->  String
 printXVar1 env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ (concatMap (\a -> " " ++ show a)  xs)
   Nothing -> "_"
+
+printXVars1 :: [Int] -> Env Expr -> String
+printXVars1 xs env = concatMap (\x -> show x ++ " -> " ++ printXVar1 env x ++ "\n") xs 
+
+printXVars :: [Int] -> Env Expr -> String
+printXVars xs env = concatMap (\x -> " " ++ printXVar env x) xs 
+
+
+

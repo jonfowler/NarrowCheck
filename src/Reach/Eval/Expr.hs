@@ -10,22 +10,22 @@ type Type = Int
 
 data Expr
   = Let !LId Expr Expr
-  | App Expr Expr
+  | App Expr [Expr]
   | Fun !FId
   | Var !LId
   | FVar !XId
   | Lam !LId Expr
   | Bottom
   | Con !CId [Atom]
-  | Local (I.IntMap Expr) Def
+  | Local (I.IntMap Expr) Def deriving (Show)
 
 type Atom = Expr
 
 data Def = Match Int [Alt] !(Maybe Def)
-         | Result [Int] Expr
+         | Result [Int] Expr deriving (Show)
 
 data Alt = Alt CId [Int] Def
-         | AltDef Def
+         | AltDef Def deriving (Show)
 
 atom :: Expr -> Bool            
 atom (Var _) = True

@@ -26,7 +26,6 @@ evalSetup fname = do
       ts <- use (funcArgTypes . at' fid)
       xs <- mapM (fvar 0) ts
       topFrees .= xs
---      (foldr (\x e -> App e (FVar x)) fexpr (reverse xs))
       return (Expr a ((atom . FVar <$> xs) ++ ap) br)
 
 evalLazy :: MonadChoice m => Expr -> ReachT m Atom

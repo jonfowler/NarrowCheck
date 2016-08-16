@@ -5,7 +5,7 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
-import Data.List (sort, sortBy)
+import Data.List 
 import Data.Function (on)
 
 import Reach.Lens
@@ -85,7 +85,7 @@ convModule d i m = Env {
 
              _env = I.empty,
  --            _nextEVar = 0,
-             _nextLVar = -1,
+             _nextLVar = 0,
 
              _funcNames = c ^. convertFuncId . mapFromInt,
              _funcIds = c ^. convertFuncId . mapToInt,
@@ -135,8 +135,8 @@ convDef c (vid, (pds, b)) = ( fromMaybe (error "Function not found")
 --             | otherwise = convOrderedDef pds
          
 
-maxPattern :: [Pattern] -> Int
-maxPattern = maximum . map varPattern
+--maxPattern :: [Pattern] -> Int
+--maxPattern = maximum . map varPattern
 
 data BackBone a = Node a (IntMap [BackBone a])
 
@@ -160,7 +160,7 @@ patternName (PatCon cid ps) (Node i b) = do
    let bs = fromMaybe (error "Internal: backbone incorrect") $ I.lookup cid b
    ps' <- patternNames ps bs 
    convertLocals . nextInt .= cl + i 
-   return (PatCon (cid, map (+cl) $ leadVars bs) ps')
+   return (PatCon (cid, map (+(cl+1)) $ leadVars bs) ps')
 
 patternNames :: [Pattern' CId VarId] -> [BackBone Int] -> State Convert [CPattern]
 patternNames  = zipWithM patternName
@@ -168,8 +168,9 @@ patternNames  = zipWithM patternName
 convPDef :: Convert -> [BackBone Int] -> ([Pattern' CId VarId], PExpr) -> ([CPattern], Expr)
 convPDef c b (ps, e) = (ps' , e') 
   where (ps' , c') = runState (patternNames ps b) $ c 
-        e' = case runExcept . runStateT (convExpr e) $ c' of
-               Left e -> error e
+        e' = case runExcept . runStateT (convExpr . desugar $ e) $ c' of
+               Left err -> error (err ++ " \n" ++ show ps ++ "\n" ++ show ps' ++ "\n" ++ show e ++
+                                 "\n")
                Right (ne,_) -> ne
 
 
@@ -178,22 +179,23 @@ leadVars [] = []
 leadVars (Node i _ : bs) = 0 : map (+i) (leadVars bs)
 
 backbone :: [[Pattern' Int a]] -> [BackBone Int]                
-backbone = map (backboner . backboneBasic)  
+backbone = map (backboner . backboneBasic) . transpose
    where
      backboner :: BackBone () -> BackBone Int
-     backboner (Node _ bs) = Node (maximum (map ((1+) . sum . map bb) $ I.elems bs')) bs'
+     backboner (Node _ bs) = Node (maximum $ 1 : map ((1+) . sum . map bb) (I.elems bs')) bs'
         where bs' = I.map (map backboner) bs
+
      backboneBasic :: [Pattern' Int a] -> BackBone ()
      backboneBasic [] = Node () (I.empty)
-     backboneBasic (PatVar _ : ps) = backboneBasic ps
+     backboneBasic (p : ps) = intersectBB (backboneBasic' p) (backboneBasic ps)
 
-     backboneBasic (PatCon c ps : qs) = undefined
      backboneBasic' :: Pattern' Int a -> BackBone ()
      backboneBasic' (PatVar _)  = Node () (I.empty)
      backboneBasic' (PatCon c ps) = Node () (I.singleton c (map backboneBasic' ps))
      
      intersectBB :: BackBone () -> BackBone () -> BackBone ()
      intersectBB (Node _ b) (Node _ b') = Node () (I.unionWith (zipWith intersectBB) b b')
+
 
 varPattern :: Pattern -> Int
 varPattern (PatVar a) = 1
@@ -209,7 +211,7 @@ groupDefs :: [([CPattern], Expr)] -> ([(CId, [Int], [([CPattern], Expr)])],
                                       Maybe (LId, [([CPattern],Expr)]))
 groupDefs [] = ([],Nothing)
 groupDefs xs@(((PatCon (cid, is) _ : _), e) : _) = first ((cid, is, map getPEs ys):) $ groupDefs ys'
-    where (ys, ys') = span (\(x:_,_) -> not (isPatVar x) && cid == getPatVar x) xs 
+    where (ys, ys') = span (\(x:_,_) -> not (isPatVar x) && cid == fst (getPatCon x)) xs 
           getPEs (PatCon _ cps : cps', e)  = (cps ++ cps', e)
 groupDefs ((PatVar vid : cps, e) : xs) = second 
                              (maybe (Just (vid,[(cps, e)])) $ \(vid,es) -> Just (vid, (cps,e):es))
@@ -272,10 +274,10 @@ usedVars :: Expr -> [Int]
 usedVars = I.keys . usedVars'
 
 usedVars' :: Expr -> I.IntMap ()              
-usedVars' (App e e') = I.union (usedVars' e) (usedVars' e')
-usedVars' (Let v e e') = I.delete v (I.union (usedVars' e) (usedVars' e'))
+usedVars' (App e es) = I.union (usedVars' e) $ foldr (\e vs -> I.union (usedVars' e) vs) I.empty es
+usedVars' (Let v e e') = I.insert v () $ I.union (usedVars' e) (usedVars' e')
 usedVars' (Var v) = I.singleton v ()
-usedVars' (Lam v e) = I.delete v (usedVars' e)
+usedVars' (Lam v e) = I.insert v () (usedVars' e)
 usedVars' (Con c es) = foldr (\e vs -> I.union (usedVars' e) vs) I.empty es
 usedVars' _ = I.empty
  
@@ -288,12 +290,15 @@ convExpr (PCon cid es) = do
   (f, as) <- atomises es'
   c <- viewConv convertCon cid
   return . f $ (Con c as) 
-convExpr (PApp f e) = App <$> convExpr f <*> convExpr e
+convExpr (PApp e1 e2) = let (f : es) = joinApps e1 [e2]
+                        in App <$> convExpr f <*> mapM convExpr es
+  where joinApps (PApp e e') es = joinApps e (e' : es)
+        joinApps e es = e : es
 convExpr (PLam v e) = Lam <$> overConv convertLocals v <*> convExpr e
   
 convExpr (PParens e) = convExpr e
 --convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
-   
+
 
 --convAlt :: PAlt PExpr -> ConvertM (Alt Expr)
 --convAlt (PAlt (PatCon cid xs)  e) = do

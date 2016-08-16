@@ -1,11 +1,11 @@
 
 import qualified Reach.Parser.Module as P
 import qualified Reach.Parser.Conv as C
-import Reach.Eval.Lazy
-import Reach.Eval.Full
---import Reach.Eval.Expr
+import Reach.Eval.Narrow
+import Reach.Eval.Reduce
+import Reach.Eval.Expr
 import Reach.Eval.Env
-import Reach.Eval.ExprBase
+--import Reach.Eval.ExprBase
 import Reach.Lens
 import Reach.Eval.Monad
 import Reach.Printer
@@ -28,7 +28,6 @@ data Flag
   = DataBound Int
   | ConstBound Int
   | GenNum Int
-  | EvalType EvalTypes
   | NoOutput
   | Refute
   | ShowFunctions
@@ -39,8 +38,6 @@ options =
       "data-depth bound",
     Option ['c'] [] (ReqArg cbound "NUM")
       "data-depth bound",
-    Option ['e'] ["eval"] (ReqArg evalType "STRING")
-      "Evaluation type F/B for Full/Basic",
     Option ['g'] ["generate"] (ReqArg gen "NUM")
       "Number of solutions to generate", 
     Option [] ["NO","nooutput"] (NoArg NoOutput)
@@ -63,11 +60,6 @@ options =
           | n >= 0 = GenNum n
           | otherwise = error "Generation number must be postiive"
           where n = read s
-        evalType "F" = EvalType EvalInterweave 
-        evalType "B" = EvalType EvalBasic 
-        evalType "Full" = EvalType EvalInterweave 
-        evalType "Basic" = EvalType EvalBasic 
-        evalType _ = error "unrecognised evaluation type"
 
 main :: IO ()
 main = do
@@ -98,7 +90,7 @@ go fn flags = do
       gs = evalState (generating 1 (getSol tr)
                      (runStrat env))
                      r
-  when showfuncs $ putStrLn (printDoc (printFuncs env))
+  when showfuncs $ putStrLn (printDoc (printDefs env))
   when output $ printResults (take genNum gs)
   unless output $ print (length (take 100 gs))
 --  when (output && not refute) (printResults (rights rs))
@@ -106,15 +98,10 @@ go fn flags = do
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
 --  print (length . rights $ rs)
     where
-      dataBound = fromMaybe 4 (listToMaybe [n | DataBound n <- flags])
-      constBound = fromMaybe 10000 (listToMaybe [n | ConstBound n <- flags])
+      dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
+      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
-      evalStrat :: MonadChoice m => Expr -> ReachT m Atom 
-      evalStrat e = case fromMaybe EvalBasic (listToMaybe [es | EvalType es <- flags]) of
-        EvalInterweave -> evalFull e 
-        EvalBasic -> evalLazy e 
---      runStrat :: MonadChoice m => Env Expr -> m (Either ReachFail Atom, Env Expr)
-      runStrat env = runReach (evalSetup "reach" >>= evalStrat) (toExpr [] [] <$> env)
+      runStrat env = runReach (narrowSetup "reach" >>= narrow) env
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
@@ -130,10 +117,10 @@ pullfst (Right b, c) = Right (b , c)
 
 
 printResults :: [(Atom, Env Expr)] -> IO ()
-printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printFVars (env ^. topFrees) env))
+printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
 printFail :: [(ReachFail, Env Expr)] -> IO ()
-printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env))
+printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
 --printAll = mapM_ (\e -> case e of
 --           Left (e, env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env)

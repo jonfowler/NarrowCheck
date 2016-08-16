@@ -15,8 +15,8 @@ build-type:          Simple
 -- extra-source-files:  
 cabal-version:       >=1.10
 
-library 
---  main-is:             Main.hs
+executable reach
+  main-is:             Main.hs
   ghc-options:
     -O2
   build-depends:       base ==4.*, 
@@ -40,19 +40,18 @@ library
                       DeriveFoldable,
                       DeriveTraversable,
                       TypeFamilies
-  exposed-modules:  
---    Reach.Eval.Env,
---    Reach.Eval.Expr,
---    Reach.Eval.Lazy,
---    Reach.Eval.Full,
---    Reach.Eval.Monad,
+  other-modules:  
 --    Reach.Printer,
 --    Reach.Lens,
---    Reach.Parser.Conv,
+    Reach.Parser.Conv,
     Reach.Parser.Indent,
     Reach.Parser.Module,
     Reach.Parser.Parse,
-    Reach.Parser.Tokens
-    Reach.Parser.Desugar
-    Reach.Eval.Expr
-    Reach.Eval.Env
+    Reach.Parser.Tokens,
+    Reach.Parser.Desugar,
+    Reach.Eval.Expr,
+    Reach.Eval.Env,
+    Reach.Eval.Monad,
+    Reach.Eval.Generate,
+    Reach.Eval.Narrow,
+    Reach.Eval.Reduce

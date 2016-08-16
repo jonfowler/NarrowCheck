@@ -1,17 +1,11 @@
 module Reach.Printer
-  (printExpr,
---   printState,
-   printDoc,
-   printFuncs,
-   putDoc
-   )where
+   where
 
 import Prelude hiding ((<$>))
 import Text.PrettyPrint.Leijen
 
 import Reach.Lens
 import Reach.Eval.Expr
-import Reach.Eval.ExprBase
 import qualified Reach.Eval.Env as E
 
 import qualified Data.IntMap as I
@@ -40,12 +34,12 @@ printExpr' s (Let v e e') = (text "let" <+> var "v" v
                                         <+> text "in"
                                         <+> printExpr s e'
                             , True)
-printExpr' s (Case e e' as) = (text "case"
-                                      <+> nest 2 (printExpr s e
-                                      <+>  (text "of" <$>
-                                              (vsep (text ">>>" <+> printExpr s e' : map (printAlt s (printExpr s)) as))))
-                           , True) 
-printExpr' s e@(App _ _) = (bracketer . map (printExpr' s) . reverse . allApps $ e, True)
+--printExpr' s (Case e e' as) = (text "case"
+--                                      <+> nest 2 (printExpr s e
+--                                      <+>  (text "of" <$>
+--                                              (vsep (text ">>>" <+> printExpr s e' : map (printAlt s (printExpr s)) as))))
+--                           , True) 
+printExpr' s (App f es) = (bracketer . map (printExpr' s) $ f : es , True)
 
 printExpr' s (Lam x e) = (text "\955" <+> var "v" x <+> text "->" <+> printExpr s e , True)
 printExpr' s (Var x) = (var "v" x , False)
@@ -57,10 +51,12 @@ printExpr' s (Con cid es) = (text (s ^. E.constrNames . at' cid)
                             , True)
 printExpr' s (Fun fid) = (text (s ^. E.funcNames . at' fid), False)
 printExpr' s Bottom = (text "BOT", False)
+printExpr' s (Local vm d) = (text "local:\n" <> printLocals s (I.toList vm) <> text "\n" <> printDef s d , False)
 
-allApps :: Expr -> [Expr]
-allApps (App e e') = e' : allApps e 
-allApps e = [e]
+printLocals s = vsep . map (\(v,e) -> var "l" v <+> text "->" <+> printExpr s e)
+--allApps :: Expr -> [Expr]
+--allApps (App e e') = e' : allApps e 
+--allApps e = [e]
  
 --printExpr :: Env -> Expr -> Doc
 --printExpr s =  fst . printExpr' s 
@@ -103,7 +99,7 @@ allApps e = [e]
 --                                (vsep . map (printAlt s (printExpr s))) as)
 --                           , True)
 -- 
-printAlt :: E.Env Expr -> (a -> Doc) -> Alt a -> Doc
+printAlt :: E.Env Expr -> (Def -> Doc) -> Alt -> Doc
 printAlt s p (Alt cid [] e) = text (s ^. E.constrNames . at' cid)
   <+> text "->"
   <+> p e
@@ -119,20 +115,36 @@ printAlt s p (AltDef e) = text "_"
 --printCont s e = printExpr s (toExpr e) 
 --
 
-printFuncs :: E.Env Expr -> Doc
-printFuncs s = vsep . map printEnv' $ I.toList (s ^. E.funcs)
- where printEnv' (x , f) = text (s ^. E.funcNames . at' x) <+> text "=>" <+> printExpr s (f ^. body) 
-  
---printEnv :: Env -> Doc
---printEnv s = vsep . map printEnv' $ I.toList (s ^. env)
---   where printEnv' (x , e) = var "e" x <+> text "=>" <+> printExpr s e
+printDef :: E.Env Expr -> Def -> Doc
+printDef s (Result vs e) = (group . hsep . map (var "b")) vs <+>
+                         printExpr s e
+printDef s (Match v alts (Just d)) = text "case"
+                                      <+> nest 2 (var "v" v
+                                      <+>  (text "of" <$>
+                                              (vsep (text ">>>" <+> printDef s d : map (printAlt s (printDef s)) alts))))
+printDef s (Match v alts Nothing) = text "case"
+                                      <+> nest 2 (var "v" v
+                                      <+>  (text "of" <$>
+                                              (vsep (map (printAlt s (printDef s)) alts))))
 
---printState :: Expr -> Env -> Doc
---printState e s = text "EXPR:"
---              <$> printExpr s e
---              <$> text "ENV:"
---              <$> printEnv s
---              <> line <> line
+
+printDefs :: E.Env Expr -> Doc
+printDefs s = vsep . map printEnv' $ I.toList (s ^. E.defs)
+ where printEnv' (x , (vs, d)) = text (s ^. E.funcNames . at' x) <+>
+                                         (group . hsep . map (var "v")) vs <+>
+                                         text "==>" <+>
+                                         printDef s d 
+  
+printEnv :: E.Env Expr -> Doc
+printEnv s = vsep . map printEnv' $ I.toList (s ^. E.env)
+   where printEnv' (x , e) = var "e" x <+> text "=>" <+> printExpr s e
+
+printState :: Expr -> E.Env Expr -> Doc
+printState e s = text "EXPR:"
+              <$> printExpr s e
+              <$> text "ENV:"
+              <$> printEnv s
+              <> line <> line
 
 printDoc :: Doc -> String
 printDoc = printSimpleDoc . renderPretty 1 90

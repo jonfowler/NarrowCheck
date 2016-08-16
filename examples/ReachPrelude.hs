@@ -6,49 +6,49 @@ data Bool = True | False deriving Show
 
 data Nat = Z | S Nat deriving Show
 
-not x = case x of
-  True -> False
-  False -> True
+not False = True
+not True = False
 
 Z <= y = True
 S x <= Z = False
 S x <= S y = x <= y
 
-x < y = case y of
-  Z -> False 
-  S y' -> case x of
-    Z -> True
-    S x' -> x' < y'
---Z < Z = False
---Z < S x = True
---S x < Z = False
---S x < S y = x < y
+--x < y = case y of
+--  Z -> False 
+--  S y' -> case x of
+--    Z -> True
+--    S x' -> x' < y'
+
+Z > y = False
+S x > S y = x > y
+S x > Z = True
+
+x < y = y > x
 
 x >= y = y <= x
 
-x == y = case x of
-  Z -> case y of
-    Z -> True
-    S y2 -> False
-  S x2 -> case y of
-    Z -> False
-    S y2 -> x2 == y2
+Z == Z = True 
+Z == S x = False
+S x == Z = False
+S x == S y = x == y
 
 x /= y = not (x == y)
 
-x > y = y < x 
+Z + y = y
+x + Z = x
+S x + y = S (x + y)
+x + S y = S (x + y)
 
-x + y = case x of
-  Z -> y
-  S x2 -> S (x2 + y)
 
 False && y = False
-True && False = False
-True && True = True 
+x && False = False
+True && y = y
+x && True = x
 
-x || y = case x of
-  False -> y 
-  True -> True 
+False || y = y
+x || False = x
+True || y = True
+x || True = True
 
 False ==> x = True -- further test
 True ==> x = x 
