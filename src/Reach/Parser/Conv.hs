@@ -118,7 +118,7 @@ convDef :: Convert -> (VarId, ([PDef], Bool)) -> (FId, ([Int], Def))
 convDef c (vid, (pds, b)) = ( fromMaybe (error "Function not found")
                                    $ c ^. convertFuncId . mapToInt . at vid,
                             ( lvs
-                            , convOverlapDef lvs cps ))
+                            , (if b then convOverlapDef else convOrderedDef) lvs cps ))
     where lvs = leadVars bckb 
           bckb = backbone $ map fst ps 
           ps = map ((map (convertCons c) . _defArgs) &&& _defBody)  pds
@@ -132,7 +132,7 @@ convDef c (vid, (pds, b)) = ( fromMaybe (error "Function not found")
 --     fromMaybe (error "Function not found") $ c ^. convertFuncId . mapToInt . at vid, 
 --     d)
 --  where newd | b = undefined -- convOverlapDef pds
---             | otherwise = convOrderedDef pds
+--             | otherwise = convOrderedDef' pds
          
 
 --maxPattern :: [Pattern] -> Int
@@ -234,7 +234,38 @@ isPatVar (PatVar _) = True
 isPatVar _ = False
 
 convOrderedDef :: [Int] -> [([CPattern], Expr)] -> Def
-convOrderedDef = undefined
+convOrderedDef is ps = fromJust $ convOrderedDef' is ps Nothing
+
+convOrderedDef' :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Maybe Def
+convOrderedDef' _ [] d = d
+convOrderedDef' _ (([], e) : _) _ = Just $ Result (usedVars e) e
+convOrderedDef' is ps d | (isVar . head) ps = let
+                                 (vs, ps') = span isVar ps
+                                 d' = convOrderedDef' is ps' d
+                               in convOrderedDef' (tail is) (first tail <$> vs) d'
+   where isVar = isPatVar . head . fst  
+convOrderedDef' is ps d | (isCon . head) ps = let
+                                 (cs, ps') = span isCon ps
+                                 d' = convOrderedDef' is ps' d
+                               in matchCon is (sortBy (compare `on` getCon) cs) d'
+
+   where isCon = not . isPatVar . head . fst 
+         getCon = fst . getPatCon . head . fst
+
+matchCon  :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Maybe Def
+matchCon (i : is) ps d = Just $ Match i alts Nothing
+   where alts = map (matchAlt is d) (groupBy ((==) `on` getCon) ps) ++ defAlt
+         defAlt = maybe [] ((:[]) . AltDef) d
+         getCon = fst . getPatCon . head . fst
+matchCon is ps d = error $ show is ++ "\n" ++ show ps 
+
+matchAlt :: [Int] ->  Maybe Def -> [([CPattern], Expr)] -> Alt 
+matchAlt is d ps = Alt c vs d' 
+  where  PatCon (c, vs) p =  head . fst . head $ ps
+         Just d' = convOrderedDef' (vs ++ is) (first ((p++) . tail) <$> ps) d
+--convOrdVar :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Def
+--convOrdVar (i : is) ps d = 
+
 
 --convFunc :: Convert -> (VarId, [PDef]) -> (FId, Def)
 --convFunc c (vid, qs) = case runExcept . runStateT s $ c of

@@ -20,4 +20,4 @@ notIn n E = True
 notIn n (C n' l) = (n /= n') && notIn n l
 
 reach :: List -> Bool
-reach l = perm s4 l
+reach l = perm s12 l

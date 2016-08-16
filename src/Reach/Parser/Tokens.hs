@@ -32,7 +32,6 @@ import Reach.Parser.Indent
 import Control.Monad.Writer
 import Control.Monad
 
-
 -- Reserved with strict indent, primarily used once in the body of an expression
 res :: String -> Parser String 
 res a = strictIndent >> reserved a
@@ -91,19 +90,22 @@ reserved x = lexeme (string x)
 whitespace :: Parser ()
 whitespace = skipMany $ void (oneOf " \n")
                      <|> void comment
-                     <|> void pragma
+                     <|> pragma
                      <|> void commentBlock
 
-pragma :: Parser String
+pragma :: Parser () 
 pragma = try $ do
   string "{-#"
+  many $ oneOf " \n"
+  stringCase "PRAGMA"
   many $ oneOf " \n"
   stringCase "OVERLAP"
   many $ oneOf " \n"
   x <- notReserved <|> (char '('  *> notReservedOp <* char ')')
   many $ oneOf " \n"
+  string "#-}"
   tell $ [Overlap x]
-  return x
+  return () 
 
 
 charCase c = char (toUpper c) <|> char (toLower c)

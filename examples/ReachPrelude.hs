@@ -19,6 +19,7 @@ S x <= S y = x <= y
 --    Z -> True
 --    S x' -> x' < y'
 
+
 Z > y = False
 S x > S y = x > y
 S x > Z = True
@@ -34,17 +35,19 @@ S x == S y = x == y
 
 x /= y = not (x == y)
 
+{-# PRAGMA OVERLAP (+) #-}
 Z + y = y
 x + Z = x
 S x + y = S (x + y)
 x + S y = S (x + y)
 
-
+{-# PRAGMA OVERLAP (&&) #-}
 False && y = False
 x && False = False
 True && y = y
 x && True = x
 
+{-# PRAGMA OVERLAP (||) #-}
 False || y = y
 x || False = x
 True || y = True
