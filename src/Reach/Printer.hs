@@ -51,7 +51,7 @@ printExpr' s (Con cid es) = (text (s ^. E.constrNames . at' cid)
                             , True)
 printExpr' s (Fun fid) = (text (s ^. E.funcNames . at' fid), False)
 printExpr' s Bottom = (text "BOT", False)
-printExpr' s (Local vm d) = (text "local:\n" <> printLocals s (I.toList vm) <> text "\n" <> printDef s d , False)
+printExpr' s (Local f vm d) = (text "local:\n" <> printLocals s (I.toList vm) <> text "\n" <> printDef s d , False)
 
 printLocals s = vsep . map (\(v,e) -> var "l" v <+> text "->" <+> printExpr s e)
 --allApps :: Expr -> [Expr]

@@ -17,7 +17,7 @@ data Expr
   | Lam !LId Expr
   | Bottom
   | Con !CId [Atom]
-  | Local (I.IntMap Expr) Def deriving (Show)
+  | Local !FId (I.IntMap Expr) Def deriving (Show)
 
 type Atom = Expr
 

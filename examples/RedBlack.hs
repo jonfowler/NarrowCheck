@@ -13,22 +13,22 @@ data Tree = E | T Colour Tree Nat Tree
 -- Methods
 
 member x E = False
-member x (T col a y b) = case x < y of
-  True -> member x a
-  False -> case x > y of
-    True -> member x b
-    False -> True
+member x (T col a y b) = if' (x < y) 
+  (member x a)
+  (if' (x > y) 
+    (member x b)
+    True)
 
 makeBlack (T col a y b) = T B a y b
 
 insert x s = makeBlack (ins x s)
 
 ins x E = T R E x E
-ins x (T col a y b) = case x < y of
-  True -> balance col (ins x a) y b
-  False -> case x > y of
-    True -> balance col a y (ins x b)
-    False -> T col a y b
+ins x (T col a y b) = if' (x < y) 
+  (balance col (ins x a) y b)
+  (if' (x > y) 
+    (balance col a y (ins x b))
+    (T col a y b))
 
 -- Mistake on 4th line, 3rd line is correct
 balance B (T R (T R a x b) y c) z d = T R (T B a x b) y (T B c z d)
@@ -49,23 +49,24 @@ blackRoot (T col a x b) = not (isRed col)
 -- INVARIANT 1. No red node has a red parent.
 
 red E = True
-red (T col a x b) = (case isRed col of
-  True -> blackRoot a && blackRoot b
-  False -> True) && red a && red b
+red (T col a x b) = if' (isRed col) (blackRoot a && blackRoot b) True
+                  && red a
+                  && red b
 
 -- INVARIANT 2. Every path from the root to an empty node contains the
 -- same number of black nodes.
 
 data Pair = Pair Bool Nat
 
+pair (Pair x y) f = f x y
+
 countBlack E = Z
-countBlack (T B t1 x t2) = S Z + countBlack t1
-countBlack (T R t1 x t2) = countBlack t1
+countBlack (T R t1 x t2) = max (countBlack t1) (countBlack t2)
+countBlack (T B t1 x t2) = S (max (countBlack t1) (countBlack t2))
 
 black E = True
 black (T c t1 x t2) = black t1 && black t2 &&
                                  (countBlack t1 == countBlack t2)
-
 maxLength E = Z
 maxLength (T c t1 x t2) = max (S (maxLength t1)) (S (maxLength t2))
 
@@ -77,27 +78,6 @@ balanced (T c t1 x t2) = balanced t1 && balanced t2 &&
 div2 Z = Z
 div2 (S Z) = S Z
 div2 (S (S x)) = S (div2 x)
-
-within2 Z y = True
-within2 (S x) Z = False
-within2 (S x) (S Z) = False
-within2 (S x) (S (S y)) = within2 x y
-
-max Z y = y
-max (S x) Z = S x
-max (S x) (S y) = S (max x y)
-
---balanced E = True
---balanced (T c t1 x t2) = 
---black t = case black' t of
---  Pair b n -> b
-
-black' E = Pair True Z
-black' (T col a x b) = case black' a of
-  Pair b0 n -> case black' b of
-    Pair b1 m -> Pair (b0 && b1 && (n == m)) (n + case isRed col of
-                                                     True -> Z
-                                                     False -> S Z)
 
 -- INVARIANT 3. Trees are ordered.
 
@@ -111,10 +91,6 @@ ord E = True
 ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 
 -- Properties
-
---infixr 0 -->
---False --> _ = True
---True --> x = x
 
 redBlack t =  black t && red t && ord t
 --              && balanced t

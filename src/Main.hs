@@ -31,6 +31,8 @@ data Flag
   | NoOutput
   | Refute
   | ShowFunctions
+  | NotSized
+  | Sized Int
 
 options :: [OptDescr Flag]
 options =
@@ -45,8 +47,11 @@ options =
     Option [] ["refute"] (NoArg Refute)
       "Refute expression",
     Option [] ["functions"] (NoArg ShowFunctions)
-      "Show 'compiled' functions"
-
+      "Show 'compiled' functions",
+    Option [] ["nosize"] (NoArg NotSized)
+      "No size argument",
+    Option ['s'] ["size"] (ReqArg siz "NUM")
+      "Maximum input size"
   ]
   where dbound s 
           | n >= 0 = DataBound n
@@ -60,6 +65,12 @@ options =
           | n >= 0 = GenNum n
           | otherwise = error "Generation number must be postiive"
           where n = read s
+        siz s
+          | n >= 0 = GenNum n
+          | otherwise = error "eneration number must be postiive"
+          where n = read s
+
+
 
 main :: IO ()
 main = do
@@ -87,7 +98,7 @@ go fn flags = do
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
 --      rs = pullfst <$> runStrat env
-      gs = evalState (generating 1 (getSol tr)
+      gs = evalState (generating 3 (getSol tr)
                      (runStrat env))
                      r
   when showfuncs $ putStrLn (printDoc (printDefs env))

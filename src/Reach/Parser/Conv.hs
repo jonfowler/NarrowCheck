@@ -261,8 +261,9 @@ matchCon is ps d = error $ show is ++ "\n" ++ show ps
 
 matchAlt :: [Int] ->  Maybe Def -> [([CPattern], Expr)] -> Alt 
 matchAlt is d ps = Alt c vs d' 
-  where  PatCon (c, vs) p =  head . fst . head $ ps
-         Just d' = convOrderedDef' (vs ++ is) (first ((p++) . tail) <$> ps) d
+  where  (c, vs) = getPatCon . head . fst . head $ ps
+         Just d' = convOrderedDef' (vs ++ is) [((qs' ++ qs), e) | (PatCon c qs' : qs, e) <- ps] d
+          
 --convOrdVar :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Def
 --convOrdVar (i : is) ps d = 
 

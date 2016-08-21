@@ -35,11 +35,23 @@ S x == S y = x == y
 
 x /= y = not (x == y)
 
+if' True x y = x         
+if' False x y = y
+
 {-# PRAGMA OVERLAP (+) #-}
 Z + y = y
 x + Z = x
 S x + y = S (x + y)
 x + S y = S (x + y)
+
+pred Z = Z
+pred (S x) = x
+
+{-# PRAGMA OVERLAP (max) #-}
+max Z y = y
+max x Z = x
+max (S x) y = S (max x (pred y))
+max x (S y) = S (max (pred x) y)
 
 {-# PRAGMA OVERLAP (&&) #-}
 False && y = False
