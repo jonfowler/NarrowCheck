@@ -21,6 +21,8 @@ import System.Environment
 import System.Console.GetOpt
 import System.IO.Error
 
+import Debug.Trace
+
 data EvalTypes = EvalInterweave       
                | EvalBasic
 
@@ -33,6 +35,7 @@ data Flag
   | ShowFunctions
   | NotSized
   | Sized Int
+  | BackTrack Int
 
 options :: [OptDescr Flag]
 options =
@@ -51,7 +54,10 @@ options =
     Option [] ["nosize"] (NoArg NotSized)
       "No size argument",
     Option ['s'] ["size"] (ReqArg siz "NUM")
-      "Maximum input size"
+      "Maximum input size",
+    Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
+      "Backtrack number"
+
   ]
   where dbound s 
           | n >= 0 = DataBound n
@@ -66,10 +72,13 @@ options =
           | otherwise = error "Generation number must be postiive"
           where n = read s
         siz s
-          | n >= 0 = GenNum n
+          | n >= 0 = Sized n
           | otherwise = error "eneration number must be postiive"
           where n = read s
-
+        backtr s
+          | n >= 0 = BackTrack n
+          | otherwise = error "eneration number must be postiive"
+          where n = read s
 
 
 main :: IO ()
@@ -98,12 +107,11 @@ go fn flags = do
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
 --      rs = pullfst <$> runStrat env
-      gs = evalState (generating 3 (getSol tr)
-                     (runStrat env))
-                     r
+      gs = evalState (generating 3 (getSol tr) (runStrat env)) r
+      gs' = evalState (sizedGenerating maxsize backtrack (getSol tr) (runSizedStrat env)) r
   when showfuncs $ putStrLn (printDoc (printDefs env))
-  when output $ printResults (take genNum gs)
-  unless output $ print (length (take 100 gs))
+  when output $ printSizedResults (take genNum gs')
+  when output $ print (length (take genNum gs'))
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -111,13 +119,20 @@ go fn flags = do
     where
       dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
       constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
+      maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
-      runStrat env = runReach (narrowSetup "reach" >>= narrow) env
+      backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
+      runStrat env = runReach (narrowSetup "reach" >>= narrow 0) env
+
+
+      runSizedStrat env = fmap (flip runReach env . (>>= narrow 0)) (sizedSetup maxsize "reach")
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
-      getSol _ _ = Nothing
+      getSol _ (Right (Con _ _), z) = Nothing
+      getSol _ (Left _, z) = Nothing
+      getSol _ (e, _) = error $ "Internal: not evaluated " ++ show e
 
 
 --      (either (const Nothing) (\(Con cid _) -> cid == tr ) . fst)
@@ -129,6 +144,9 @@ pullfst (Right b, c) = Right (b , c)
 
 printResults :: [(Atom, Env Expr)] -> IO ()
 printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
+
+printSizedResults :: [(Int, (Atom, Env Expr))] -> IO ()
+printSizedResults = mapM_ (\(i, (e,env)) -> putStrLn (show i ++ " ==> " ++ showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
 printFail :: [(ReachFail, Env Expr)] -> IO ()
 printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. topFrees) env))

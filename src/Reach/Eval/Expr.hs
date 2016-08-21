@@ -21,7 +21,7 @@ data Expr
 
 type Atom = Expr
 
-data Def = Match Int [Alt] !(Maybe Def)
+data Def = Match Int (I.IntMap ()) [Alt] (I.IntMap ()) !(Maybe Def)
          | Result [Int] Expr deriving (Show)
 
 data Alt = Alt CId [Int] Def

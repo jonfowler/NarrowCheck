@@ -65,10 +65,16 @@ countBlack (T R t1 x t2) = max (countBlack t1) (countBlack t2)
 countBlack (T B t1 x t2) = S (max (countBlack t1) (countBlack t2))
 
 black E = True
-black (T c t1 x t2) = black t1 && black t2 &&
-                                 (countBlack t1 == countBlack t2)
+black (T c t1 x t2) = (countBlack t1 == countBlack t2) && black t1 && black t2 
+
+blackN E Z = True
+blackN E (S n) = False
+blackN (T R t1 x t2) n = blackN t1 n && blackN t2 n
+blackN (T B t1 x t2) (S n) = blackN t1 n && blackN t2 n 
+blackN (T B t1 x t2) Z = False
+                                 
 maxLength E = Z
-maxLength (T c t1 x t2) = max (S (maxLength t1)) (S (maxLength t2))
+maxLength (T c t1 x t2) = S (max (maxLength t1) (maxLength t2))
 
 balanced E = True
 balanced (T c t1 x t2) = balanced t1 && balanced t2 &&
@@ -92,7 +98,12 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 
 -- Properties
 
+smax E = True
+smax (T c t0 a t1) = a < s4 && smax t0 && smax t1
+
 redBlack t =  black t && red t && ord t
+
+sizeBlack t n = countBlack t == n
 --              && balanced t
 -- ord t &&
 
@@ -103,10 +114,18 @@ ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
 reach :: Nat -> Tree -> Bool
-reach = prop_insertRB
+reach n t = (blackN t n) && redBlack t && smax t
 
-  --black t ==> balanced t
+  --prop_insertRB
 
-   
-
-
+  --black t ==> balanced
+--T (R)
+--  (T (B) (E) (_) (E))
+--  (_)
+--  (T (B)
+--      (T (R) (E) (_) (E))
+--      (_)
+--      (T (R)
+--         (E)
+--         (_)
+--         (T (_) (_) (_) (_))))

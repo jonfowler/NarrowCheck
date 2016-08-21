@@ -90,7 +90,8 @@ data Env a = Env {
   _funcNames :: IntMap String,
   _funcIds :: Map String FId,
   _constrNames :: IntMap String,
-  _constrIds :: Map String CId
+  _constrIds :: Map String CId,
+  _typeNames :: IntMap String
   } deriving Functor
 
 makeLenses ''Env
@@ -111,7 +112,7 @@ printXVar env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ bracket (map (printXVar env) xs)
   Nothing -> "_"
 
-printXVar1 :: Env Expr -> FId ->  String
+printXVar1 :: Env Expr -> XId ->  String
 printXVar1 env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ (concatMap (\a -> " " ++ show a)  xs)
   Nothing -> "_"

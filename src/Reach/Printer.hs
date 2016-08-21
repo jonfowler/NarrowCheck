@@ -118,11 +118,11 @@ printAlt s p (AltDef e) = text "_"
 printDef :: E.Env Expr -> Def -> Doc
 printDef s (Result vs e) = (group . hsep . map (var "b")) vs <+>
                          printExpr s e
-printDef s (Match v alts (Just d)) = text "case"
+printDef s (Match v _ alts _ (Just d)) = text "case"
                                       <+> nest 2 (var "v" v
                                       <+>  (text "of" <$>
                                               (vsep (text ">>>" <+> printDef s d : map (printAlt s (printDef s)) alts))))
-printDef s (Match v alts Nothing) = text "case"
+printDef s (Match v _ alts _ Nothing) = text "case"
                                       <+> nest 2 (var "v" v
                                       <+>  (text "of" <$>
                                               (vsep (map (printAlt s (printDef s)) alts))))

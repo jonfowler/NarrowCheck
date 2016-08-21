@@ -47,7 +47,7 @@ x + S y = S (x + y)
 pred Z = Z
 pred (S x) = x
 
-{-# PRAGMA OVERLAP (max) #-}
+{-# PRAGMA OVERLAP max #-}
 max Z y = y
 max x Z = x
 max (S x) y = S (max x (pred y))

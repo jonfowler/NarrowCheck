@@ -92,7 +92,8 @@ convModule d i m = Env {
 
              _typeConstr = I.fromList $ map (convData c) (M.toList $ m ^. moduleData),
              _constrNames = c ^. convertCon . mapFromInt,
-             _constrIds = c ^. convertCon . mapToInt 
+             _constrIds = c ^. convertCon . mapToInt, 
+             _typeNames = c ^. convertTypes . mapFromInt
              }
   where c = setupConvert m
 
@@ -224,7 +225,7 @@ convOverlapDef' :: [Int] -> [([CPattern], Expr)] -> Def
 convOverlapDef' _ (([], e) : _) = Result (usedVars e) e
 convOverlapDef' (_ : is) ps | all (isPatVar . head . fst) ps = convOverlapDef is (map (first tail) ps)
 convOverlapDef' (i : is) ps = case groupDefs ps of
-  (alts, ol) -> Match i (toAlt <$> alts) (convOverlapDef is . snd <$> ol)
+  (alts, ol) -> Match i (I.empty) (toAlt <$> alts) (I.empty) (convOverlapDef is . snd <$> ol)
      where toAlt (cid, is', ps') = Alt cid is' $ convOverlapDef (is' ++ is) ps'
 
 --  where ps' = sortBy (compare `on` (head . fst)) ps
@@ -253,7 +254,7 @@ convOrderedDef' is ps d | (isCon . head) ps = let
          getCon = fst . getPatCon . head . fst
 
 matchCon  :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Maybe Def
-matchCon (i : is) ps d = Just $ Match i alts Nothing
+matchCon (i : is) ps d = Just $ Match i (I.empty) alts (I.empty) Nothing
    where alts = map (matchAlt is d) (groupBy ((==) `on` getCon) ps) ++ defAlt
          defAlt = maybe [] ((:[]) . AltDef) d
          getCon = fst . getPatCon . head . fst

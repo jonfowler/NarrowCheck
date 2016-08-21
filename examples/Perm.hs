@@ -19,5 +19,5 @@ allDiff (C n l) = notIn n l && allDiff l
 notIn n E = True
 notIn n (C n' l) = (n /= n') && notIn n l
 
-reach :: List -> Bool
-reach l = perm s12 l
+reach :: Nat -> List -> Bool
+reach n l = perm n l
