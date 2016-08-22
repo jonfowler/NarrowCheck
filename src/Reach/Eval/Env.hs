@@ -84,7 +84,7 @@ data Env a = Env {
 --  _nextEVar :: !EId,
   _nextLVar :: !LId,
 
-  _typeConstr :: IntMap [(CId, [Type])],
+  _typeConstr :: IntMap [(CId, Int, [Type])],
 
 
   _funcNames :: IntMap String,

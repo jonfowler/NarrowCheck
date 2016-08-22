@@ -10,6 +10,8 @@ data Colour = R | B
 
 data Tree = E | T Colour Tree Nat Tree
 
+{-# DIST E 1 #-}
+{-# DIST T 10 #-}
 -- Methods
 
 member x E = False
@@ -59,27 +61,29 @@ red (T col a x b) = if' (isRed col) (blackRoot a && blackRoot b) True
 data Pair = Pair Bool Nat
 
 pair (Pair x y) f = f x y
+fst (Pair x y) = x
 
-countBlack E = Z
-countBlack (T R t1 x t2) = max (countBlack t1) (countBlack t2)
-countBlack (T B t1 x t2) = S (max (countBlack t1) (countBlack t2))
+maxBlack E = Z
+maxBlack (T R t1 x t2) = max (maxBlack t1) (maxBlack t2)
+maxBlack (T B t1 x t2) = S (max (maxBlack t1) (maxBlack t2))
 
-black E = True
-black (T c t1 x t2) = (countBlack t1 == countBlack t2) && black t1 && black t2 
+black t = fst (black' t)
+
+black' E = Pair True Z
+black' (T c t1 x t2) = black'' c (black' t1) (black' t2) 
+
+black'' R (Pair b1 m) (Pair b2 n) = Pair (b1 && b2 && (m == n)) (max m n)
+black'' B (Pair b1 m) (Pair b2 n) = Pair (b1 && b2 && (m == n)) (S (max m n))
+
+ifB R m n = n 
+ifB B m n = m 
 
 blackN E Z = True
 blackN E (S n) = False
 blackN (T R t1 x t2) n = blackN t1 n && blackN t2 n
 blackN (T B t1 x t2) (S n) = blackN t1 n && blackN t2 n 
 blackN (T B t1 x t2) Z = False
-                                 
-maxLength E = Z
-maxLength (T c t1 x t2) = S (max (maxLength t1) (maxLength t2))
 
-balanced E = True
-balanced (T c t1 x t2) = balanced t1 && balanced t2 &&
-        ((div2 (maxLength t1) <= maxLength t2)
-         || (div2 (maxLength t2) <= (maxLength t1)))
 
 div2 Z = Z
 div2 (S Z) = S Z
@@ -101,20 +105,17 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 smax E = True
 smax (T c t0 a t1) = a < s4 && smax t0 && smax t1
 
-redBlack t =  black t && red t && ord t
+redBlack t = blackRoot t && black t && red t && ord t
 
-sizeBlack t n = countBlack t == n
---              && balanced t
--- ord t &&
+--sizeBlack t n = countBlack t == n
 
--- refute
 prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 
 ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
 reach :: Nat -> Tree -> Bool
-reach n t = (blackN t n) && redBlack t && smax t
+reach n t = redBlack t && (maxBlack t < s4)
 
   --prop_insertRB
 

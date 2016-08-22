@@ -35,10 +35,10 @@ import Control.Applicative
 data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
-   _moduleData :: Map TypeId [(ConId,[PType])],
+   _moduleData :: Map TypeId [(ConId, Int, [PType])],
    _moduleDef :: Map VarId ([PDef], Bool),  
    _moduleTypeDef :: Map VarId PType,
-   _moduleCon :: Map ConId [PType]
+   _moduleCon :: Map ConId (TypeId, [PType])
   } deriving (Show)
 makeLenses ''Module
 
@@ -81,7 +81,7 @@ addData (tid, d) = do
   case a of
     Just _ -> throwError $ "Type "++ tid ++ " already defined\n"
     Nothing -> do moduleData . at tid ?= d
-                  sequence_ (addCon <$> d)
+                  sequence_ (uncurry addCon <$> zip (repeat tid) d)
 
 addImport :: [String] -> StateT Module (Except String) ()
 addImport i = moduleImports %= (i:)
@@ -103,12 +103,12 @@ addTypeDef (vid, d) = do
     Just _ -> throwError $ "Type of variable " ++ vid ++ " already defined\n"
     Nothing -> moduleTypeDef . at vid ?= d
 
-addCon :: (ConId, [PType]) -> StateT Module (Except String) ()
-addCon (cid, ts) = do
+addCon :: TypeId -> (ConId,Int , [PType]) -> StateT Module (Except String) ()
+addCon tid (cid, _, ts) = do
   a <- use (moduleCon . at cid)
   case a of
     Just _ -> throwError $ "Constructor " ++ cid ++ " already defined\n"
-    Nothing -> moduleCon . at cid ?= ts
+    Nothing -> moduleCon . at cid ?= (tid, ts)
 
 --td@(TypeDef vid const) (Module ds defs tds) = case M.lookup vid tds of
 --  Just _ -> throwError $ "Variable " ++ varId vid ++ "already has its type defined"
@@ -132,18 +132,24 @@ parserOfModule = do
                <|> addDef <$> try parseDef
                <|> addTypeDef <$> parseTypeDef)
 
-addOverlaps :: [Pragma] -> Module -> Module  
-addOverlaps p m = foldr addOverlap m p
+addPragmas :: [Pragma] -> Module -> Module  
+addPragmas p m = foldr addPragma m p
 
-addOverlap :: Pragma -> Module -> Module  
-addOverlap (Overlap p) m = moduleDef . ix p . _2 .~ True $ m
+addPragma :: Pragma -> Module -> Module  
+addPragma (Overlap p) m = moduleDef . ix p . _2 .~ True $ m
+addPragma (Dist c n) m = case m ^. moduleCon . at c of
+   Just (t, _) -> moduleData . ix t %~ changeFreq $ m
+      where changeFreq [] = []
+            changeFreq ((cid, f, ts) : cs) | cid == c = (cid, n, ts) : cs
+            changeFreq (c1 : cs) = c1 : changeFreq cs
+   Nothing -> m
 
 parseModule :: Monad m => String -> m Module
 parseModule s = case runParse parserOfModule s of
   Failure err -> fail . show $ err
   Success (m, ps) -> case runExcept m of 
     Left err -> fail err
-    Right m -> return (addOverlaps ps m)
+    Right m -> return (addPragmas ps m)
 
 checkModule :: Monad m => Module -> m ()
 checkModule m = case runExcept (checkTypeDefs m >> checkScopes m) of
@@ -174,7 +180,7 @@ checkTypeDef m f = case M.lookup f (m ^. moduleDef) of
 
 checkTypeScopes :: Module -> Except String ()
 checkTypeScopes m = do
-  mapMOf_ (moduleData . folded . folded . _2 . folded) (checkTypeScope m) m
+  mapMOf_ (moduleData . folded . folded . _3 . folded) (checkTypeScope m) m
   mapMOf_ (moduleTypeDef . folded) (checkTypeScope m) m
 
 --checkTypeScopes :: Module -> Except String Module

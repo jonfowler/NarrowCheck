@@ -47,7 +47,7 @@ makeLenses ''PDef
 data PType = PType :-> PType
           | Type TypeId deriving (Show)
 
-type PData = (TypeId, [(ConId, [PType])])
+type PData = (TypeId, [(ConId, Int, [PType])])
 
   --PData {_dataName :: TypeId, _dataCon :: [(ConId, [PType])]} deriving (Show)
 --makeLenses ''PData

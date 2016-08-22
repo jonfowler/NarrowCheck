@@ -29,6 +29,7 @@ data ParseState = ParseState {_indentLevel :: Int64 }
 makeLenses ''ParseState
 
 data Pragma = Overlap String 
+            | Dist String Int 
                   
 type Parser = WriterT [Pragma] (StateT ParseState T.Parser)    --ParsecT String ParseState Identity a
 --type ParserT m a =    ParsecT String ParseState m a

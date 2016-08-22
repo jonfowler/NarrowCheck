@@ -1,4 +1,4 @@
-module Tree where
+module Tree2 where
 
 data Tree = Leaf | Node Tree Nat Tree
 

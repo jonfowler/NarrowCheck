@@ -97,9 +97,9 @@ convModule d i m = Env {
              }
   where c = setupConvert m
 
-convData :: Convert -> (TypeId, [(ConId, [PType])]) -> (Type, [(CId, [Type])])
+convData :: Convert -> (TypeId, [(ConId, Int, [PType])]) -> (Type, [(CId, Int, [Type])])
 convData c (tid, cs) = (c ^. convertTypes . mapToInt . at' tid, map convConType cs)
-   where convConType (cid, ts) = (c ^. convertCon . mapToInt . at' cid,
+   where convConType (cid, n, ts) = (c ^. convertCon . mapToInt . at' cid, n,
                                   map (convType c . simpleType) ts)
 
 convDefArg :: Convert -> (VarId, PType) -> (FId, [Type])

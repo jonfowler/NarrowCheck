@@ -35,9 +35,9 @@ parseData = do
   strictIndent
   tid <- parseTypeId
   res "="
-  ds <-sepBy1 (strictIndent >> parseCon parseType) (res "|")
+  ds <- sepBy1 (strictIndent >> parseCon parseType) (res "|")
   optional (res "deriving" >> many (strictIndent >> anyChar) >> whitespace)
-  return (tid, ds)
+  return (tid, map (\(c,ts) -> (c,1,ts)) ds)
 
 parseModuleHead :: Parser [String]            
 parseModuleHead = try (top "module") >> parseModuleName <* lexeme (string "where")
