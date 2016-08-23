@@ -11,7 +11,7 @@ data Colour = R | B
 data Tree = E | T Colour Tree Nat Tree
 
 {-# DIST E 1 #-}
-{-# DIST T 10 #-}
+{-# DIST T 3 #-}
 -- Methods
 
 member x E = False
@@ -105,7 +105,7 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 smax E = True
 smax (T c t0 a t1) = a < s4 && smax t0 && smax t1
 
-redBlack t = blackRoot t && black t && red t && ord t
+redBlack t k = blackRoot t && blackN t k && red t && ord t
 
 --sizeBlack t n = countBlack t == n
 
@@ -114,19 +114,6 @@ prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
-reach :: Nat -> Tree -> Bool
-reach n t = redBlack t && (maxBlack t < s4)
+reach :: Nat -> Nat -> Tree -> Bool
+reach n k t = redBlack t k && (k < s6)
 
-  --prop_insertRB
-
-  --black t ==> balanced
---T (R)
---  (T (B) (E) (_) (E))
---  (_)
---  (T (B)
---      (T (R) (E) (_) (E))
---      (_)
---      (T (R)
---         (E)
---         (_)
---         (T (_) (_) (_) (_))))

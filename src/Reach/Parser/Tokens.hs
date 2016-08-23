@@ -115,8 +115,6 @@ pragma :: Parser ()
 pragma = try $ do
   string "{-#"
   some $ oneOf " \n"
-  stringCase "PRAGMA"
-  some $ oneOf " \n"
   stringCase "OVERLAP"
   some $ oneOf " \n"
   x <- notReserved <|> (char '('  *> notReservedOp <* char ')')
