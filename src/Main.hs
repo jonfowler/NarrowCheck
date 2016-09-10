@@ -1,15 +1,15 @@
 
-import qualified Reach.Parser.Module as P
-import qualified Reach.Parser.Conv as C
-import Reach.Eval.Narrow
-import Reach.Eval.Reduce
-import Reach.Eval.Expr
-import Reach.Eval.Env
---import Reach.Eval.ExprBase
-import Reach.Lens
-import Reach.Eval.Monad
-import Reach.Printer
-import Reach.Eval.Generate
+import qualified Overlap.Parser.Module as P
+import qualified Overlap.Parser.Conv as C
+import Overlap.Eval.Narrow
+import Overlap.Eval.Reduce
+import Overlap.Eval.Expr
+import Overlap.Eval.Env
+--import Overlap.Eval.ExprBase
+import Overlap.Lens
+import Overlap.Eval.Monad
+import Overlap.Printer
+import Overlap.Eval.Generate
 import System.Random
       
 import Control.Monad.Except
@@ -106,11 +106,13 @@ go fn flags = do
   let env = C.convModule constBound dataBound m'
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
+      js = env ^. constrIds . at' "Res"
+      fl = env ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      gs = evalState (generating 3 (getSol tr) (runStrat env)) r
-      gs' = evalState (sizedGenerating maxsize backtrack (getSol tr) (runSizedStrat env)) r
+      gs = evalState (generating backtrack (return . getSol tr) (runStrat env)) r
+      gs' = evalState (sizedGenerating maxsize backtrack (return . getSol tr) (runSizedStrat env)) r
   when showfuncs $ putStrLn (printDoc (printDefs env))
-  when output $ printSizedResults (take genNum gs')
+  when output $ printSizedResults (zip [1..] $ take genNum gs')
   when output $ print (length (take genNum gs'))
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
@@ -122,13 +124,22 @@ go fn flags = do
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
-      runStrat env = runReach (narrowSetup "reach" >>= narrow 0) env
+      runStrat env = runOverlap (narrowSetup "reach" >>= narrow Nothing) env
 
-
-      runSizedStrat env = fmap (flip runReach env . (>>= narrow 0)) (sizedSetup maxsize "reach")
+      runSizedStrat env = fmap (flip runOverlap env . (>>= narrow Nothing)) (sizedSetup maxsize "reach")
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
       refute = not (null [() | Refute <- flags])
+
+      getSolProp rs (Right (Con cid es), z) | cid == rs = Just <$> evalRes (head es) z
+      getSolProp _ (Right (Con _ _), z) = return Nothing
+      getSolProp _ (Left _, z) = return Nothing
+      getSolProp _ (e, _) = error $ "Internal: not evaluated "
+
+      evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
+--       toLeftRight (Con cid es)
+--       toLeftRight
+
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
       getSol _ (Right (Con _ _), z) = Nothing
       getSol _ (Left _, z) = Nothing
@@ -145,10 +156,10 @@ pullfst (Right b, c) = Right (b , c)
 printResults :: [(Atom, Env Expr)] -> IO ()
 printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
-printSizedResults :: [(Int, (Atom, Env Expr))] -> IO ()
-printSizedResults = mapM_ (\(i, (e,env)) -> putStrLn (show i ++ " ==> " ++ showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
+printSizedResults :: [(Int, (Int, (Atom, Env Expr)))] -> IO ()
+printSizedResults = mapM_ (\(i ,(j, (e,env))) -> putStrLn (show i ++ " ==> " ++ showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
-printFail :: [(ReachFail, Env Expr)] -> IO ()
+printFail :: [(OverlapFail, Env Expr)] -> IO ()
 printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. topFrees) env))
 
 --printAll = mapM_ (\e -> case e of
@@ -162,9 +173,9 @@ printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. t
 --printFVars :: [Int] -> Env Expr -> IO ()
 --printFVars xs env = mapM_ (\x -> putStrLn ("  " ++ printFVar env x)) xs 
 
---runF :: FId -> Env -> [Either ReachFail (Atom, Env)]
---runF fid env = runReach (evalLazy (Fun fid, [])) env
+--runF :: FId -> Env -> [Either OverlapFail (Atom, Env)]
+--runF fid env = runOverlap (evalLazy (Fun fid, [])) env
 
 
 --runF :: FId -> Env -> [(Expr, Env)]
---runF fid env = runReach (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)) Fin)) env
+--runF fid env = runOverlap (newFVar >>= (\x -> evalLazy (App (Fun fid) (FVar x)) Fin)) env
