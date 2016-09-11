@@ -65,10 +65,11 @@ x || False = x
 True || y = True
 x || True = True
 
-data Result = Fail | Res Bool
+data Result = NoTest | Fail | Success 
 
-False ==> x = Fail 
-True ==> x = Res x
+False ==> x = NoTest 
+True ==> False = Fail
+True ==> True = Success
 
 s1 = S Z
 s2 = S s1 

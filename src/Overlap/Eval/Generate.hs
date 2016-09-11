@@ -10,7 +10,6 @@ import Data.IntMap(IntMap)
 
 import Data.Maybe
 
-import Debug.Trace
 
 newStdGen :: State StdGen StdGen
 newStdGen = do
@@ -55,8 +54,8 @@ generate bt p (Branch ts) = do
           return (Left (i-1), [])
         select i ts = do
           (xs, (fq, t) : xs')  <- splitRand ts 
-          (e, t) <- generate bt p t
-          let ts' = if nullT t then (xs ++ xs') else xs ++ (fq, t) : xs'
+          (e, t') <- generate bt p t
+          let ts' = if nullT t' then (xs ++ xs') else xs ++ (fq, t') : xs'
           case e of
             Left 0 -> return $ (Left 0, ts')
             Left i' -> select (min i i') (xs ++ xs')

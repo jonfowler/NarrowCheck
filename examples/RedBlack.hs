@@ -105,7 +105,9 @@ ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
 smax E = True
 smax (T c t0 a t1) = a <= s4 && smax t0 && smax t1
 
-redBlack t k = blackRoot t && blackN t k && red t && ord t
+redBlackN t k = blackRoot t && blackN t k && red t && ord t
+
+redBlack t = red t && black t && ord t
 
 --sizeBlack t n = countBlack t == n
 
@@ -114,6 +116,6 @@ prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
-reach :: Nat -> Nat -> Tree -> Bool
-reach n k t = redBlack t k && (k == s4) && smax t 
+reach :: Nat -> Nat -> Tree -> Result 
+reach k a t = (redBlackN t k && (k <= s3)) ==> redBlack (insert a t)
 

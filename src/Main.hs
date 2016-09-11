@@ -31,7 +31,7 @@ data Flag
   | ConstBound Int
   | GenNum Int
   | NoOutput
-  | Refute
+  | Generate
   | ShowFunctions
   | NotSized
   | Sized Int
@@ -43,18 +43,20 @@ options =
       "data-depth bound",
     Option ['c'] [] (ReqArg cbound "NUM")
       "data-depth bound",
-    Option ['g'] ["generate"] (ReqArg gen "NUM")
+    Option ['g'] ["generate"] (NoArg Generate)
+      "Number of solutions to generate", 
+    Option ['n'] ["number"] (ReqArg number "NUM")
       "Number of solutions to generate", 
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No output",
-    Option [] ["refute"] (NoArg Refute)
-      "Refute expression",
+--    Option [] ["refute"] (NoArg Refute)
+--      "Refute expression",
     Option [] ["functions"] (NoArg ShowFunctions)
       "Show 'compiled' functions",
-    Option [] ["nosize"] (NoArg NotSized)
-      "No size argument",
-    Option ['s'] ["size"] (ReqArg siz "NUM")
-      "Maximum input size",
+--    Option [] ["nosize"] (NoArg NotSized)
+--      "No size argument",
+--    Option ['s'] ["size"] (ReqArg siz "NUM")
+--      "Maximum input size",
     Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
       "Backtrack number"
 
@@ -67,7 +69,7 @@ options =
           | n >= 0 = ConstBound n
           | otherwise = error "DataDepth Bound must be positive"
           where n = read s
-        gen s
+        number s
           | n >= 0 = GenNum n
           | otherwise = error "Generation number must be postiive"
           where n = read s
@@ -106,14 +108,31 @@ go fn flags = do
   let env = C.convModule constBound dataBound m'
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
-      js = env ^. constrIds . at' "Res"
+
+      nt = env ^. constrIds . at' "NoTest"
+      sc = env ^. constrIds . at' "Success"
       fl = env ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      gs = evalState (generating backtrack (return . getSol tr) (runStrat env)) r
-      gs' = evalState (sizedGenerating maxsize backtrack (return . getSol tr) (runSizedStrat env)) r
+      genRes = evalState (generating backtrack (return . getSol tr) (runStrat env)) r
+      propRes = convBool <$> evalState (generating backtrack (getSolProp nt) (runStrat env)) r
+
+      convBool ((Con cid _), z) | cid == sc = Right z
+                                | cid == fl = Left z
+      convBool _ = error "should be true or false"
+--      gs' = evalState (sizedGenerating maxsize backtrack (return . getSol tr) (runSizedStrat env)) r
   when showfuncs $ putStrLn (printDoc (printDefs env))
-  when output $ printSizedResults (zip [1..] $ take genNum gs')
-  when output $ print (length (take genNum gs'))
+  if prop
+    then do
+       let r = [ z | Left z <- take genNum propRes]
+       case r of
+         [] -> putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests" 
+         (z : e) -> do
+           putStrLn "Failed test:"
+           printFailure z
+    else do
+      
+       when output . printResults $ take genNum genRes
+       when output $ print (length (take genNum genRes))
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -122,23 +141,21 @@ go fn flags = do
       dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
       constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
+      prop = null [() | Generate <- flags] 
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
       runStrat env = runOverlap (narrowSetup "reach" >>= narrow Nothing) env
 
-      runSizedStrat env = fmap (flip runOverlap env . (>>= narrow Nothing)) (sizedSetup maxsize "reach")
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
-      refute = not (null [() | Refute <- flags])
+--      refute = not (null [() | Refute <- flags])
 
-      getSolProp rs (Right (Con cid es), z) | cid == rs = Just <$> evalRes (head es) z
-      getSolProp _ (Right (Con _ _), z) = return Nothing
+      getSolProp nt (Right (Con cid es), z) | cid == nt = return Nothing
+      getSolProp _ (Right (Con cid' es), z) = return . Just $ (Con cid' es, z)
       getSolProp _ (Left _, z) = return Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
       evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
---       toLeftRight (Con cid es)
---       toLeftRight
 
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
       getSol _ (Right (Con _ _), z) = Nothing
@@ -151,6 +168,9 @@ go fn flags = do
 pullfst :: (Either a b, c) -> Either (a, c) (b, c)
 pullfst (Left a, c) = Left (a , c)
 pullfst (Right b, c) = Right (b , c)
+
+printFailure :: Env Expr -> IO ()
+printFailure env = putStrLn $ printXVars (env ^. topFrees) env
 
 
 printResults :: [(Atom, Env Expr)] -> IO ()
