@@ -6,6 +6,9 @@ data Bool = True | False deriving Show
 
 data Nat = Z | S Nat deriving Show
 
+{-# DIST Z 1 #-}                              
+{-# DIST S 5 #-}                              
+
 not False = True
 not True = False
 

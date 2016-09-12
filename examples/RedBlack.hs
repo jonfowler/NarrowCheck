@@ -117,5 +117,5 @@ ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
 reach :: Nat -> Nat -> Tree -> Result 
-reach k a t = (redBlackN t k && (k <= s3)) ==> redBlack (insert a t)
+reach k a t = (redBlackN t k && (k <= s4)) ==> True -- redBlack (insert a t)
 
