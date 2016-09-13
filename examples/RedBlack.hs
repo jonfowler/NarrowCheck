@@ -1,7 +1,7 @@
 module RedBlack where
 
 import Prelude ()
-import ReachPrelude
+import OverlapPrelude
 
 -- Red-Black trees in a functional setting, by Okasaki.
 -- (With invariants coded, and a fault injected.)

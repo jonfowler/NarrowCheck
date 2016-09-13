@@ -1,7 +1,7 @@
 module Tree where
 
 import Prelude ()
-import ReachPrelude
+import OverlapPrelude
 
 data Tree = Leaf | Node Tree Nat Tree
 
