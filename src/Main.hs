@@ -11,6 +11,7 @@ import Overlap.Eval.Monad
 import Overlap.Printer
 import Overlap.Eval.Generate
 import System.Random
+import Data.Time
       
 import Control.Monad.Except
 
@@ -123,9 +124,13 @@ go fn flags = do
   when showfuncs $ putStrLn (printDoc (printDefs env))
   if prop
     then do
+       x <- getCurrentTime
        let r = [ z | Left z <- take genNum propRes]
        case r of
-         [] -> putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests" 
+         [] -> do
+           x' <- getCurrentTime
+           let timetaken = diffUTCTime x' x
+           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ show timetaken
          (z : e) -> do
            putStrLn "Failed test:"
            printFailure z

@@ -7,7 +7,7 @@ data Bool = True | False deriving Show
 data Nat = Z | S Nat deriving Show
 
 {-# DIST Z 1 #-}                              
-{-# DIST S 5 #-}                              
+{-# DIST S 2 #-}                              
 
 not False = True
 not True = False
@@ -56,6 +56,9 @@ max x Z = x
 max (S x) y = S (max x (pred y))
 max x (S y) = S (max (pred x) y)
 
+andTrad False x = False
+andTrad True x = x
+
 {-# OVERLAP (&&) #-}
 False && y = False
 x && False = False
@@ -67,6 +70,12 @@ False || y = y
 x || False = x
 True || y = True
 x || True = True
+
+{-# OVERLAP (===>) #-}
+True ===> y = y 
+x ===> False = not x
+False ===> y = True 
+x ===> True = True
 
 data Result = NoTest | Fail | Success 
 
@@ -87,3 +96,6 @@ s10 = S s9
 s11 = S s10
 s12 = S s11
 
+s20 = s10 + s10     
+s30 = s20 + s10
+s40 = s20 + s20
