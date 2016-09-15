@@ -174,7 +174,7 @@ sortParens :: Either (PExpr, Maybe (OpId, Maybe ((PExpr -> PExpr) -> PExpr)))
 sortParens (Left (e, Nothing)) = e 
 sortParens (Left (e, Just (o, Nothing))) = POpL e o
 sortParens (Left (e, Just (o, Just f))) = f (POp e o)
-sortParens (Right (o, Nothing)) = POpVar o
+sortParens (Right (o, Nothing)) = PVar o
 sortParens (Right (o, Just e)) = POpR o e
 
  

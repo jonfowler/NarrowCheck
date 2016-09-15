@@ -46,14 +46,15 @@ isRed R = True
 isRed B = False
 
 blackRoot E = True
-blackRoot (T col a x b) = not (isRed col)
+blackRoot (T B a x b) = True
+blackRoot x = False
 
 -- INVARIANT 1. No red node has a red parent.
 
-red E = True
-red (T col a x b) = if' (isRed col) (blackRoot a && blackRoot b) True
-                  && red a
-                  && red b
+red and E = True
+red and (T col a x b) = and
+    (if' (isRed col) (and (blackRoot a) (blackRoot b)) True)
+    (and (red and a) (red and b))
 
 -- INVARIANT 2. Every path from the root to an empty node contains the
 -- same number of black nodes.
@@ -78,11 +79,11 @@ black'' B (Pair b1 m) (Pair b2 n) = Pair (b1 && b2 && (m == n)) (S (max m n))
 ifB R m n = n 
 ifB B m n = m 
 
-blackN E Z = True
-blackN E (S n) = False
-blackN (T R t1 x t2) n = blackN t1 n && blackN t2 n
-blackN (T B t1 x t2) (S n) = blackN t1 n && blackN t2 n 
-blackN (T B t1 x t2) Z = False
+blackN and E Z = True
+blackN and E (S n) = False
+blackN and (T R t1 x t2) n = and (blackN and t1 n) (blackN and t2 n)
+blackN and (T B t1 x t2) (S n) = and (blackN and t1 n) (blackN and t2 n )
+blackN and (T B t1 x t2) Z = False
 
 
 div2 Z = Z
@@ -94,20 +95,31 @@ div2 (S (S x)) = S (div2 x)
 allLe x E = True
 allLe x (T col t0 a t1) = (a <= x) && allLe x t0 && allLe x t1
 
+allT and p E = True
+allT and p (T col t0 a t1) = and (p a) (and (allT and p t0) (allT and p t1))
+
 allGe x E = True
 allGe x (T col t0 a t1) = (a >= x) && allGe x t0 && allGe x t1
 
-ord E = True
-ord (T col t0 a t1) = allLe a t0 && allGe a t1 && ord t0 && ord t1
+ord and E = True
+ord and (T col t0 a t1) =  and (allT and (<= a) t0)
+                          (and (allT and (a <=) t1)
+                          (and (ord and t0)
+                               (ord and t1)))
 
 -- Properties
 
 smax E = True
 smax (T c t0 a t1) = a <= s4 && smax t0 && smax t1
 
-redBlackN t k = blackRoot t && blackN t k && red t && ord t
+redBlackN and t k =  and (blackRoot t)
+                    (and (blackN and t k)
+                    (and (red and t)
+                         (ord and t)))
 
-redBlack t = red t && black t && ord t
+redBlack and t =  and (red and t)
+                 (and (black t)
+                      (ord and t))
 
 --sizeBlack t n = countBlack t == n
 
@@ -116,6 +128,12 @@ prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 ex1 :: Tree
 ex1 = T B (T B E Z E) Z (T B E Z E)
 
+nodeDepth :: Tree -> Nat -> Bool
+nodeDepth E x = True
+nodeDepth (T c t1 x t2) (S n) = nodeDepth t1 n  && nodeDepth t2 n
+nodeDepth x a = False
+
 reach :: Nat -> Nat -> Tree -> Result 
-reach k a t = (redBlackN t k && (k <= s4)) ==> True -- redBlack (insert a t)
+--reach k a t = (redBlackN andTrad t k && (k == s3) && nodeDepth t s5) ==> True -- redBlack (insert a t)
+reach k a t = (redBlackN (&&) t k && (k <= s1)) ==> True -- redBlack (insert a t)
 

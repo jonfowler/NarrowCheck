@@ -9,7 +9,6 @@ import Data.Function
 
 import Overlap.Lens
 
-
 {- The following module evaluates the applications of a constructor
 and then atomises the fields of the constructor-}
 
@@ -36,13 +35,13 @@ deOp' (PLet v e e') = PLet v <$> deOp' e <*> deOp' e'
 
 deOp' (PParens e) = deOp' e
 deOp' (POp e o e') = PApp <$> (PApp (PVar o) <$> deOp' e) <*> deOp' e'
-deOp' (POpVar o) = return $ PVar o
+--deOp' (POpVar o) = return $ PVar o
 deOp' (POpL e o) = PApp (PVar o) <$> deOp' e
 deOp' (POpR o e) = do  
   i <- get
   put (i+1)
   e' <- deOp' e
-  let v = "##" ++ show v
+  let v = "##" ++ show i
   return . PLam v $ PApp (PApp (PVar o) (PVar v)) e'
 
 data Bunch = Bunch ConId [([Pattern], PExpr)]

@@ -3,6 +3,8 @@ module Expr where
 import Prelude ()
 import OverlapPrelude
 
+
+
 data Expr = Add Expr Expr
           | If Expr Expr Expr
           | N Nat 
@@ -13,11 +15,16 @@ data Expr = Add Expr Expr
 
 data Type = TypeN | TypeB | NoType
 
+
 depthExpr :: Expr -> Nat
 depthExpr (N v) = Z
 depthExpr (B v) = Z
 depthExpr (If e e' e'') = S (max (depthExpr e) (max (depthExpr e') (depthExpr e'')))
 depthExpr (Add e e') = S (max (depthExpr e) (depthExpr e'))
+
+welltyped :: Type -> Bool
+welltyped NoType = False
+welltyped x = True 
 
 typeof :: Expr -> Type 
 typeof (N v) = TypeN 
@@ -32,24 +39,20 @@ typeIf u v w = NoType
 typeAdd TypeN TypeN = TypeN
 typeAdd u v = NoType
 
-
-
-oftype :: Expr -> Type -> Bool
-oftype (N u) TypeN = True
-oftype (B v) TypeB = True
-oftype (If e e' e'') t = oftype e TypeB && oftype e' t && oftype e'' t
-oftype (Add e e') TypeN = oftype e TypeN && oftype e' TypeN
-oftype u v = False
-
-
-
+oftype and (N u) TypeN = True
+oftype and (B v) TypeB = True
+oftype and (If e e' e'') t =  and (oftype and e TypeB)
+                             (and (oftype and e' t)
+                                  (oftype and e'' t))
+oftype and (Add e e') TypeN =  and (oftype and e TypeN)
+                                   (oftype and e' TypeN)
+oftype and u v = False
 
 reach :: Type -> Expr -> Result 
-reach t e = (oftype e t && (depthExpr e <= s7)) ==> noError (evalExpr e)
+reach t e = (oftype (andTrad) e t && (depthExpr e <= s7)) ==> noError (evalExpr e)
 
-
-
-
+--reach :: Expr -> Result
+--reach e = (welltyped (typeof e) && (depthExpr e <= s7)) ==> noError (evalExpr e) 
             
 data ExprRes = ResN Nat | ResB Bool | ResError
 
@@ -70,3 +73,4 @@ evalAdd u v = ResError
 evalIf (ResB True) p q = p
 evalIf (ResB False) p q = q
 evalIf u v w = ResError
+

@@ -11,7 +11,7 @@ data PExpr
   -- The following constructors are the "core" constructors, they are used for
   -- parsing and then PExpr are converted to only use these types
   = PApp PExpr PExpr
---  | PCase PExpr [PAlt PExpr] (Maybe PExpr)
+  | PCase PExpr [PAlt PExpr] (Maybe PExpr)
   | PCon ConId [PExpr]
   | PVar VarId
   | PLam VarId PExpr
@@ -20,7 +20,7 @@ data PExpr
   -- The following are used in parsing but then desugared to the above constructors
   | PParens PExpr
   | POp PExpr OpId PExpr 
-  | POpVar OpId
+--  | POpVar OpId
   | POpL PExpr OpId
   | POpR OpId PExpr
   deriving (Show)

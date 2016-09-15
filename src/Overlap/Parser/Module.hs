@@ -214,6 +214,7 @@ checkScopeExp m locals (POp e v e') = checkScopeExp m locals e <||> checkScope m
                                      checkScopeExp m locals e'
 checkScopeExp m locals (POpR v e') = checkScope m locals v <||> checkScopeExp m locals e'
 checkScopeExp m locals (POpL e v) = checkScopeExp m locals e <||> checkScope m locals v
+checkScopeExp _  _ e = error $ "non-exhaustive patterns checkScopeExpr: " ++ show e
 
 (<||>) :: MonadError e m => m a -> m a -> m ()
 e <||> e' = do

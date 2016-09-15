@@ -327,7 +327,10 @@ convExpr (PApp e1 e2) = let (f : es) = joinApps e1 [e2]
                         in App <$> convExpr f <*> mapM convExpr es
   where joinApps (PApp e e') es = joinApps e (e' : es)
         joinApps e es = e : es
-convExpr (PLam v e) = Lam <$> overConv convertLocals v <*> convExpr e
+convExpr (PLam v e) = do
+  v' <- overConv convertLocals v
+  e' <- convExpr e
+  return (Lam v' e')
   
 convExpr (PParens e) = convExpr e
 --convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
