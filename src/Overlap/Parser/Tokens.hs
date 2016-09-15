@@ -32,8 +32,6 @@ import Overlap.Parser.Indent
 import Control.Monad.Writer
 import Control.Monad
 
-import Debug.Trace
-
 -- Reserved with strict indent, primarily used once in the body of an expression
 res :: String -> Parser String 
 res a = strictIndent >> reserved a
@@ -107,8 +105,7 @@ distr = try $ do
   n <- some $ digit
   some $ oneOf " \n"
   string "#-}"
-  trace ("Distribution: " ++ x) $
-    tell $ [Dist x (read n)]
+  tell $ [Dist x (read n)]
   return () 
 
 pragma :: Parser () 
