@@ -23,12 +23,17 @@ narrowSetup :: Monad m => String -> OverlapT m Expr
 narrowSetup fname = do
   fid' <- use (funcIds . at fname)
   case fid' of
-    Nothing -> error $ "The " ++ fname ++ " function does not a type"
+    Nothing -> error $ "The " ++ fname ++ " function is not defined"
     Just fid -> do
-      ts <- use (defArgTypes . at' fid)
-      xs <- mapM (fvar 0) ts
-      topFrees .= xs
-      return $ App (Fun fid) (FVar <$> xs)
+      ts' <- use (defArgTypes . at fid)
+      case ts' of
+        Nothing -> error $ "The " ++ fname
+                             ++ " function does not have a type"
+        Just tid -> do
+          ts <- use (defArgTypes . at' fid)
+          xs <- mapM (fvar 0) ts
+          topFrees .= xs
+          return $ App (Fun fid) (FVar <$> xs)
 
 sizedSetup :: Monad m => Int -> String -> IntMap (OverlapT m Expr)
 sizedSetup n fname = I.fromList $ map ss [0..(n-1)]
