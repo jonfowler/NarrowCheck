@@ -10,8 +10,6 @@ The easiest way to install is using the [Haskell stack tool](https://docs.haskel
 
 There are pre-written examples in the example directory.
 
-Example use:
-
-\> overlapCheck Tree.hs
-
+Example use:  
+\> overlapCheck Tree.hs  
 \> +++ Ok, successfully passed 100 tests in 2.501164s
