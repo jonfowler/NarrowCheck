@@ -9,10 +9,10 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Node 5 #-}
 
 reach :: Nat -> Tree -> Result 
---reach n t = (ordered (&&) t && (depth t <= s8))
---                                      ==> ordered (&&) (del n t) 
-reach n t = andTrad (depth t <= s5) (ordered andTrad t)
-                                      ==> ordered andTrad (del n t)
+reach n t = ((ordered (&&) t) && (depth t <= s5))
+                                      ==> ordered (&&) (del n t) 
+--reach n t = andTrad (depth t <= s5) (ordered andTrad t)
+--                                      ==> ordered andTrad (del n t)
 
 allT and p Leaf = True
 allT and p (Node t1 x t2) =  and (p x)
@@ -20,11 +20,11 @@ allT and p (Node t1 x t2) =  and (p x)
                                  (allT and p t2))
 
 --
---allle i Leaf = True 
---allle i (Node t1 x t2) = x <= i && allle i t1 && allle i t2
---
---allge i Leaf = True
---allge i (Node t1 x t2) = x >= i && allge i t1 && allge i t2
+allle i Leaf = True 
+allle i (Node t1 x t2) = x <= i && allle i t1 && allle i t2
+
+allge i Leaf = True
+allge i (Node t1 x t2) = x >= i && allge i t1 && allge i t2
 
 del n Leaf = Leaf
 del n (Node t1 a t2) = if' (a < n)
@@ -41,9 +41,13 @@ ext (Node t11 a t12) t2 = Node t11 a (ext t12 t2)
 --ord (Node t1 a t2) = allT a t1 && allge a t2
 
 -- Correct defintion of ordering                    
+
+le x y = y <= x
+ge x y = y >= x
+
 ordered and Leaf = True
-ordered and (Node t1 a t2) =  and (allT and (<= a) t1)
-                             (and (allT and (>= a) t2)
+ordered and (Node t1 a t2) =  and (allT and (le a) t1)
+                             (and (allT and (ge a) t2)
                              (and (ordered and t1)
                                   (ordered and t2)))
 
