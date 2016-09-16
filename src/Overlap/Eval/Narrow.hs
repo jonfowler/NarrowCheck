@@ -23,7 +23,7 @@ narrowSetup :: Monad m => String -> OverlapT m Expr
 narrowSetup fname = do
   fid' <- use (funcIds . at fname)
   case fid' of
-    Nothing -> error "The reach function does not a type"
+    Nothing -> error $ "The " ++ fname ++ " function does not a type"
     Just fid -> do
       ts <- use (defArgTypes . at' fid)
       xs <- mapM (fvar 0) ts

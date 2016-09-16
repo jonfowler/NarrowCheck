@@ -25,6 +25,8 @@ allDiff (C n l) = notIn n l && allDiff l
 notIn n E = True
 notIn n (C n' l) = (n /= n') && notIn n l
 
-reach :: List -> Result
---reach l = permTrad s9 l ==> True
-reach l = perm s9 l ==> True
+check :: List -> Result
+check l = perm s9 l ==> True
+
+checkTrad :: List -> Result
+checkTrad = permTrad s9 l ==> True

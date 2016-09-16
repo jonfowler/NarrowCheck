@@ -8,10 +8,10 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Leaf 1 #-}
 {-# DIST Node 5 #-}
 
-reach :: Nat -> Tree -> Result 
-reach n t = ((ordered (&&) t) && (depth t <= s5))
+check :: Nat -> Tree -> Result 
+check n t = ((ordered (&&) t) && (depth t <= s5))
                                       ==> ordered (&&) (del n t) 
---reach n t = andTrad (depth t <= s5) (ordered andTrad t)
+--check n t = andTrad (depth t <= s5) (ordered andTrad t)
 --                                      ==> ordered andTrad (del n t)
 
 allT and p Leaf = True

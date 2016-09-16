@@ -42,11 +42,12 @@ executable overlapCheck
                       DeriveTraversable,
                       TypeFamilies
   other-modules:  
---    Overlap.Printer,
---    Overlap.Lens,
+    Overlap.Printer,
+    Overlap.Lens,
     Overlap.Parser.Conv,
     Overlap.Parser.Indent,
     Overlap.Parser.Module,
+    Overlap.Parser.PExpr,
     Overlap.Parser.Parse,
     Overlap.Parser.Tokens,
     Overlap.Parser.Desugar,
