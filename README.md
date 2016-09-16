@@ -20,3 +20,31 @@ must have an explicit type:
 > overlapCheck -n 10 -p checkTrad Tree.hs  
 > +++ Ok, successfully passed 10 tests in 8.431095s
 
+## Language
+
+The proto-type implements a small functional language which is consistent
+with a small subset of haskell. The language allows simple algebraic
+data-types, pattern matching in definitions, type annotations for
+definitions and module imports. It does not allow features such as
+polymorphism and case expressions. GHC can be used to type-check 
+and test any programs written in the subset.
+
+### Overlapping pragma
+
+A definition that uses of overlapping patterns should be accompanied
+by a pragma:
+
+> {-# OVERLAP (+) #-}  
+> Z + x = x  
+> x + Z = x  
+> S x + y = S (x + y)  
+> x + S y = S (x + y)  
+
+### Distribution pragma
+
+A algebraic data-type can be accompanied by a pragma giving the
+frequency it should be chosen in needed narrowing (default it 1):
+
+> data Tree = Node Tree Nat Tree | Leaf  
+> {-# DIST Node 1 #-}  
+> {-# DIST Leaf 5 #-}  
