@@ -13,7 +13,5 @@ and then running **stack install** in the directory.
 There are pre-written examples in the example directory.
 
 Example use:
-
 \> overlapCheck Tree.hs
-
 \> +++ Ok, successfully passed 100 tests in 2.501164s
