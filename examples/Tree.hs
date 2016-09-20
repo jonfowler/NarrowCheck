@@ -9,11 +9,11 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Node 5 #-}
 
 check :: Nat -> Tree -> Result 
-check n t = (ord t && (depth t <= s7))
+check n t = (ord t && (depth t <= s5))
                                       ==> ord (del n t) 
 
 checkTrad :: Nat -> Tree -> Result 
-checkTrad n t = andTrad (depth t <= s4) (ordTrad t)
+checkTrad n t = andTrad (depth t <= s3) (ordTrad t)
                                       ==> ordTrad (del n t)
 
 ord = ordered (&&)
