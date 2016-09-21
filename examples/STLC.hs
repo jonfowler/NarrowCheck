@@ -15,6 +15,8 @@ data Expr = Add Expr Expr
             
 data Type = TypeN | TypeB | Fun Type Type | NoType
 
+data Eval = Val Expr | Error
+
 TypeN =|= TypeN = True
 TypeB =|= TypeB = True
 Fun t t' =|= Fun u u' = (t =|= u) && (t' =|= u')
@@ -41,10 +43,31 @@ oftype (B b) TypeB ts = True
 oftype (Var v) t ts = oftypeVar v t ts
 oftype (Lam e) (Fun t t') ts = oftype e t' (C t ts)
 oftype (App t' e e') t ts = oftype e (Fun t' t) ts && oftype e' t' ts
+oftype e t c = False
 
 oftypeVar Z t (C t' ts) = t =|= t'
 oftypeVar (S x) t (C t' ts) = oftypeVar x t ts
 oftypeVar a b c = False
+
+depthExpr :: Expr -> Nat
+depthExpr (Add e e') = S (max (depthExpr e) (depthExpr e'))
+depthExpr (If e e' e'') = S (max (depthExpr e)
+                            (max (depthExpr e')
+                                 (depthExpr e'')))
+depthExpr (App t' e e') = S (max (depthExpr e) (depthExpr e'))
+depthExpr (Lam e) = depthExpr e
+depthExpr x = Z
+
+subst :: Nat -> Expr -> Expr -> Expr
+subst n e (Var v) = if (v < n)
+                       (Var v)
+                       (if (v == n)
+                           (  ))
+subst n e (Lam e') = subst (S n) e e'
+
+check :: Expr -> Type -> Result
+check e t = oftype e t E && (depthExpr e <= s5)
+                 ==> True
 
 {-# DIST Add 3 #-}
 {-# DIST If 3 #-}

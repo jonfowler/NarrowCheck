@@ -25,9 +25,9 @@ executable overlapCheck
                        lens == 4.*, 
                        random == 1.*,
                        wl-pprint == 1.2,
-                       parsers == 0.12.3,
-                       trifecta == 1.5.2,
-                       time == 1.5.*
+                       parsers == 0.12.*,
+                       trifecta == 1.6.*,
+                       time == 1.6.*
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: GeneralizedNewtypeDeriving, 
@@ -42,11 +42,12 @@ executable overlapCheck
                       DeriveTraversable,
                       TypeFamilies
   other-modules:  
---    Overlap.Printer,
---    Overlap.Lens,
+    Overlap.Printer,
+    Overlap.Lens,
     Overlap.Parser.Conv,
     Overlap.Parser.Indent,
     Overlap.Parser.Module,
+    Overlap.Parser.PExpr,
     Overlap.Parser.Parse,
     Overlap.Parser.Tokens,
     Overlap.Parser.Desugar,

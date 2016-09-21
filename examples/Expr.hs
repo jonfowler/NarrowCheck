@@ -48,11 +48,11 @@ oftype and (Add e e') TypeN =  and (oftype and e TypeN)
                                    (oftype and e' TypeN)
 oftype and u v = False
 
-reach :: Type -> Expr -> Result 
-reach t e = (oftype (andTrad) e t && (depthExpr e <= s7)) ==> noError (evalExpr e)
+check :: Type -> Expr -> Result 
+check t e = (oftype (andTrad) e t && (depthExpr e <= s7)) ==> noError (evalExpr e)
 
---reach :: Expr -> Result
---reach e = (welltyped (typeof e) && (depthExpr e <= s7)) ==> noError (evalExpr e) 
+--check :: Expr -> Result
+--check e = (welltyped (typeof e) && (depthExpr e <= s7)) ==> noError (evalExpr e) 
             
 data ExprRes = ResN Nat | ResB Bool | ResError
 

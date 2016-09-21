@@ -36,6 +36,7 @@ data Flag
   | ShowFunctions
   | NotSized
   | Sized Int
+  | PropName String
   | BackTrack Int
 
 options :: [OptDescr Flag]
@@ -50,8 +51,8 @@ options =
       "Number of solutions to generate", 
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No output",
---    Option [] ["refute"] (NoArg Refute)
---      "Refute expression",
+    Option ['p'] ["property"] (ReqArg  PropName "String")
+       "Name of property to be tested",
     Option [] ["functions"] (NoArg ShowFunctions)
       "Show 'compiled' functions",
 --    Option [] ["nosize"] (NoArg NotSized)
@@ -91,7 +92,7 @@ main = do
     (fs, [fn], []) -> go fn fs
     (_, _ , errs) -> error $ concat errs ++
                       usageInfo header options
-  where header = "Usage: reach [OPTION...] FILE.rh"
+  where header = "Usage: overlapCheck [OPTION...] FILE.rh"
 
 toFileName :: [String] -> FilePath
 toFileName [a] = a ++ ".hs"
@@ -149,7 +150,10 @@ go fn flags = do
       prop = null [() | Generate <- flags] 
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
-      runStrat env = runOverlap (narrowSetup "reach" >>= narrow Nothing) env
+      propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
+
+      runStrat env = runOverlap (narrowSetup propName
+                                     >>= narrow Nothing) env
 
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]

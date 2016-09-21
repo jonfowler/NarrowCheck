@@ -133,7 +133,7 @@ nodeDepth E x = True
 nodeDepth (T c t1 x t2) (S n) = nodeDepth t1 n  && nodeDepth t2 n
 nodeDepth x a = False
 
-reach :: Nat -> Nat -> Tree -> Result 
---reach k a t = (redBlackN andTrad t k && (k == s3) && nodeDepth t s5) ==> True -- redBlack (insert a t)
-reach k a t = (redBlackN (&&) t k && (k <= s1)) ==> True -- redBlack (insert a t)
+check :: Nat -> Nat -> Tree -> Result 
+--check k a t = (redBlackN andTrad t k && (k == s3) && nodeDepth t s5) ==> True -- redBlack (insert a t)
+check k a t = (redBlackN (&&) t k && (k <= s1)) ==> True -- redBlack (insert a t)
 
