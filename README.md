@@ -1,6 +1,6 @@
 # overlapCheck
 
-This is the proto-type implementation of a overlapping property based testing tool as described in the [Failing Faster paper](https://github.com/JonFowler/overlapCheck/blob/master/FailingFasterPaper.pdf).
+This is the proto-type implementation of a overlapping property based testing tool as described in the [Failing Faster paper](https://github.com/JonFowler/overlapCheck/blob/master/FailingFaster.pdf).
 
 ## Installation:
 
