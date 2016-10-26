@@ -12,13 +12,17 @@ There examples in the examples directory.
 
 Example use:  
 > overlapCheck Tree.hs  
-> +++ Ok, successfully passed 100 tests in 2.501164s
+> +++ Ok, successfully passed 100 tests in 2.50s
 
 By default the tool will test the property named *check*. This can
-be altered by using the *property* flag, the property to be tested
-must have an explicit type:
-> overlapCheck -n 10 -p checkTrad Tree.hs  
-> +++ Ok, successfully passed 10 tests in 8.431095s
+be altered by using the *property* flag (*-p*).
+
+The tool can also accept a *size* argument (*--sized*,*-s*). A natural
+number which should be the first argument to the property.
+
+> overlapCheck -p checkn -s5 Tree.hs  
+> +++ Ok, successfully passed 100 tests in 2.35s
+
 
 ## Language
 
