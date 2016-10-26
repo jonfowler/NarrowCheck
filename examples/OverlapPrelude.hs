@@ -50,6 +50,9 @@ x + S y = S (x + y)
 pred Z = Z
 pred (S x) = x
 
+maxTrad Z y = y
+maxTrad (S x) y = S (maxTrad x (pred y))
+
 {-# OVERLAP max #-}
 max Z y = y
 max x Z = x
@@ -58,6 +61,10 @@ max x (S y) = S (max (pred x) y)
 
 andTrad False x = False
 andTrad True x = x
+
+-- Traditional and
+False *&&* y = False
+True *&&* y = y
 
 {-# OVERLAP (&&) #-}
 False && y = False
