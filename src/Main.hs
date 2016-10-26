@@ -12,6 +12,7 @@ import Overlap.Printer
 import Overlap.Eval.Generate
 import System.Random
 import Data.Time
+import Data.Fixed
       
 import Control.Monad.Except
 
@@ -131,7 +132,7 @@ go fn flags = do
          [] -> do
            x' <- getCurrentTime
            let timetaken = diffUTCTime x' x
-           when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ show timetaken)
+           when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2)
          (z : e) -> do
            when output $ putStrLn "Failed test:" >> printFailure z
        unless output $ print (length r) 
@@ -174,6 +175,10 @@ go fn flags = do
       getSol _ (Left _, z) = Nothing
       getSol _ (e, _) = error $ "Internal: not evaluated " ++ show e
 
+
+showDec :: RealFrac a => a -> Int -> String
+showDec n d = show (floor n :: Int) ++ "." ++ show (floor n' :: Int) ++ "s"
+                   where n' = (mod' n 1) * (10 ^ d)
 
 --      (either (const Nothing) (\(Con cid _) -> cid == tr ) . fst)
 
