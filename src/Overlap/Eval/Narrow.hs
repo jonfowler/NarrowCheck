@@ -35,10 +35,8 @@ narrowSetup fname = do
           topFrees .= xs
           return $ App (Fun fid) (FVar <$> xs)
 
-sizedSetup :: Monad m => Int -> String -> IntMap (OverlapT m Expr)
-sizedSetup n fname = I.fromList $ map ss [0..(n-1)]
-  where
-  ss t = (t, do
+sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
+sizedSetup n fname = do
     fid' <- use (funcIds . at fname)
     case fid' of
       Nothing -> error "The reach function does not a type"
@@ -47,7 +45,7 @@ sizedSetup n fname = I.fromList $ map ss [0..(n-1)]
         ev <- get 
         xs <- mapM (fvar 0) ts
         topFrees .= xs
-        return $ App (Fun fid) (intToNat ev t : map FVar xs)) 
+        return $ App (Fun fid) (intToNat ev n : map FVar xs)
 
 intToNat :: Env Expr -> Int -> Expr
 intToNat ev 0 = Con zer []

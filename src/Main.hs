@@ -57,8 +57,8 @@ options =
       "Show 'compiled' functions",
 --    Option [] ["nosize"] (NoArg NotSized)
 --      "No size argument",
---    Option ['s'] ["size"] (ReqArg siz "NUM")
---      "Maximum input size",
+    Option ['s'] ["size"] (ReqArg siz "NUM")
+      "Input size argument",
     Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
       "Backtrack number"
 
@@ -77,11 +77,11 @@ options =
           where n = read s
         siz s
           | n >= 0 = Sized n
-          | otherwise = error "eneration number must be postiive"
+          | otherwise = error "Size must be postiive"
           where n = read s
         backtr s
           | n >= 0 = BackTrack n
-          | otherwise = error "eneration number must be postiive"
+          | otherwise = error "Backtrack number must be postiive"
           where n = read s
 
 
@@ -131,14 +131,13 @@ go fn flags = do
          [] -> do
            x' <- getCurrentTime
            let timetaken = diffUTCTime x' x
-           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ show timetaken
+           when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ show timetaken)
          (z : e) -> do
-           putStrLn "Failed test:"
-           printFailure z
+           when output $ putStrLn "Failed test:" >> printFailure z
+       unless output $ print (length r) 
     else do
-      
        when output . printResults $ take genNum genRes
-       when output $ print (length (take genNum genRes))
+       unless output $ print (length (take genNum genRes))
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -151,9 +150,13 @@ go fn flags = do
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
       propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
+      sizeArg = listToMaybe [n | Sized n <- flags] 
 
-      runStrat env = runOverlap (narrowSetup propName
+      setupNarrow = maybe narrowSetup sizedSetup sizeArg
+
+      runStrat env = runOverlap (setupNarrow propName
                                      >>= narrow Nothing) env
+ --     runSizedStrat env i = runOverlap (narrowSizedSetup i propName >>= narrow Nothing) env
 
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
