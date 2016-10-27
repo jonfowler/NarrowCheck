@@ -23,4 +23,4 @@ checkn :: Nat -> List -> Result
 checkn n l = perm n l ==> True
 
 check :: List -> Result
-check l = check n s9
+check l = checkn s9 l
