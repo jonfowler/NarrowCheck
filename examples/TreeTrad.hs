@@ -9,7 +9,7 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Node 5 #-}
 
 checkn :: Nat -> Nat -> Tree -> Result 
-checkn i n t = (ordered t *&&* (depth t <= i))
+checkn i n t = ((depth t <= i) *&&* ordered t)
                                       ==> ordered (del n t) 
 
 check :: Nat -> Tree -> Result 

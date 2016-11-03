@@ -29,9 +29,7 @@ data EvalTypes = EvalInterweave
                | EvalBasic
 
 data Flag 
-  = DataBound Int
-  | ConstBound Int
-  | GenNum Int
+  = GenNum Int
   | NoOutput
   | Generate
   | ShowFunctions
@@ -42,37 +40,22 @@ data Flag
 
 options :: [OptDescr Flag]
 options =
-  [ Option ['d'] [] (ReqArg dbound "NUM")
-      "data-depth bound",
-    Option ['c'] [] (ReqArg cbound "NUM")
-      "data-depth bound",
-    Option ['g'] ["generate"] (NoArg Generate)
-      "Number of solutions to generate", 
+  [ Option ['g'] ["generate"] (NoArg Generate)
+      "Generate test cases (instead of refuting property)", 
     Option ['n'] ["number"] (ReqArg number "NUM")
       "Number of solutions to generate", 
-    Option [] ["NO","nooutput"] (NoArg NoOutput)
-      "No output",
-    Option ['p'] ["property"] (ReqArg  PropName "String")
-       "Name of property to be tested",
-    Option [] ["functions"] (NoArg ShowFunctions)
-      "Show 'compiled' functions",
---    Option [] ["nosize"] (NoArg NotSized)
---      "No size argument",
     Option ['s'] ["size"] (ReqArg siz "NUM")
       "Input size argument",
     Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
-      "Backtrack number"
-
+      "Backtrack number",
+    Option [] ["NO","nooutput"] (NoArg NoOutput)
+      "No printed output",
+    Option ['p'] ["property"] (ReqArg  PropName "String")
+       "Name of property to be tested",
+    Option [] ["functions"] (NoArg ShowFunctions)
+      "Output compiled functions"
   ]
-  where dbound s 
-          | n >= 0 = DataBound n
-          | otherwise = error "DataDepth Bound must be positive"
-          where n = read s
-        cbound s 
-          | n >= 0 = ConstBound n
-          | otherwise = error "DataDepth Bound must be positive"
-          where n = read s
-        number s
+  where number s
           | n >= 0 = GenNum n
           | otherwise = error "Generation number must be postiive"
           where n = read s
@@ -108,7 +91,7 @@ go fn flags = do
   m' <- P.mergeModules m ms
   P.checkModule m'
   r <- getStdGen
-  let env = C.convModule constBound dataBound m'
+  let env = C.convModule 100000000 10000000 m'
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
 
@@ -144,8 +127,8 @@ go fn flags = do
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
 --  print (length . rights $ rs)
     where
-      dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
-      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
+--      dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
+--      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       prop = null [() | Generate <- flags] 
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
