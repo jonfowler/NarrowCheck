@@ -111,15 +111,13 @@ go fn flags = do
       fl = env ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
       genRes = evalState (generating backtrack (return . getSol tr) (runStrat env)) r
-      propRes = convBool <$> evalState (generating backtrack (getSolProp nt) (runStrat env)) r
-
-      convBool ((Con cid _), z) | cid == sc = Right z
-                                | cid == fl = Left z
-      convBool _ = error "should be true or false"
---      gs' = evalState (sizedGenerating maxsize backtrack (return . getSol tr) (runSizedStrat env)) r
-  when showfuncs $ putStrLn (printDoc (printDefs env))
-  if prop
-    then do
+      enumRes = convBool <$> enumerate (getSolProp nt) (runStrat env)
+      propRes = convBool <$>
+                evalState (generating backtrack
+                                      (return . getSolProp nt)
+                                      (runStrat env))
+                           r
+      outputProp = do
        x <- getCurrentTime
        let r = [ z | Left z <- take genNum propRes]
        case r of
@@ -127,9 +125,32 @@ go fn flags = do
            x' <- getCurrentTime
            let timetaken = diffUTCTime x' x
            when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2)
-         (z : e) -> do
+         (z : e) -> 
            when output $ putStrLn "Failed test:" >> printFailure z
-       unless output $ print (length r) 
+       unless output $ print (length r)
+
+      outputEnum = do 
+        x <- getCurrentTime
+        let r = [z | Left z <- enumRes]
+        case r of
+          [] -> do
+            x' <- getCurrentTime
+            let timetaken = diffUTCTime x' x
+            when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++ showDec timetaken 2)
+          (z : e) -> 
+            when output $ putStrLn "Failed test:" >> printFailure z
+        unless output $ print (length r)
+       
+      convBool ((Con cid _), z) | cid == sc = Right z
+                                | cid == fl = Left z
+      convBool _ = error "should be true or false"
+
+
+  when showfuncs $ putStrLn (printDoc (printDefs env))
+  if prop
+    then if not enum 
+         then outputProp
+         else outputEnum
     else do
        when output . printResults $ take genNum genRes
        unless output $ print (length (take genNum genRes))
@@ -141,6 +162,7 @@ go fn flags = do
       dataBound = fromMaybe 10000 (listToMaybe [n | DepthBound n <- flags])
 --      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
+      enum = not (null [() | Enumerate <- flags])
       prop = null [() | Generate <- flags] 
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
@@ -157,9 +179,9 @@ go fn flags = do
       output = null [() | NoOutput <- flags]
 --      refute = not (null [() | Refute <- flags])
 
-      getSolProp nt (Right (Con cid es), z) | cid == nt = return Nothing
-      getSolProp _ (Right (Con cid' es), z) = return . Just $ (Con cid' es, z)
-      getSolProp _ (Left _, z) = return Nothing
+      getSolProp nt (Right (Con cid es), z) | cid == nt = Nothing
+      getSolProp _ (Right (Con cid' es), z) = Just $ (Con cid' es, z)
+      getSolProp _ (Left _, z) = Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
       evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)

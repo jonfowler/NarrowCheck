@@ -6,15 +6,18 @@ import OverlapPrelude
 data Tree = Leaf | Node Tree Nat Tree
 
 {-# DIST Leaf 1 #-}
-{-# DIST Node 5 #-}
+{-# DIST Node 2 #-}
 
 checkn :: Nat -> Nat -> Tree -> Result 
-checkn i n t = ((depth t <= i) *&&* ordered t)
+checkn i n t = ((depth t <= i) *&&* ordered t && (depthNat t <= s30))
                                       ==> ordered (del n t) 
 
 check :: Nat -> Tree -> Result 
 check n t = checkn s5 n t 
 
+depthNat :: Tree -> Nat
+depthNat Leaf = Z
+depthNat (Node t1 a t2) = max a (max (depthNat t1) (depthNat t2))
 
 allle i Leaf = True 
 allle i (Node t1 x t2) = x <= i *&&* allle i t1 *&&* allle i t2

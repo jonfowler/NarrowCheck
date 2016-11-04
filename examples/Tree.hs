@@ -6,7 +6,7 @@ import OverlapPrelude
 data Tree = Leaf | Node Tree Nat Tree
 
 {-# DIST Leaf 1 #-}
-{-# DIST Node 5 #-}
+{-# DIST Node 2 #-}
 
 checkn :: Nat -> Nat -> Tree -> Result 
 checkn i n t = (ordered t && (depth t <= i))
