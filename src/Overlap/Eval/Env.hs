@@ -91,7 +91,8 @@ data Env a = Env {
   _funcIds :: Map String FId,
   _constrNames :: IntMap String,
   _constrIds :: Map String CId,
-  _typeNames :: IntMap String
+  _typeNames :: IntMap String,
+  _typeIds :: Map String Int
   } deriving Functor
 
 makeLenses ''Env

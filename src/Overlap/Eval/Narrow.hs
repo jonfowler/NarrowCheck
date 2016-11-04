@@ -39,13 +39,18 @@ sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
 sizedSetup n fname = do
     fid' <- use (funcIds . at fname)
     case fid' of
-      Nothing -> error "The reach function does not a type"
+      Nothing -> error $ "The property " ++ fname ++ " does not have a type"
       Just fid -> do
-        (_ : ts) <- use (defArgTypes . at' fid)
-        ev <- get 
-        xs <- mapM (fvar 0) ts
-        topFrees .= xs
-        return $ App (Fun fid) (intToNat ev n : map FVar xs)
+        (t : ts) <- use (defArgTypes . at' fid)
+        tid <- use (typeIds . at' "Nat")
+        if (tid /= t)
+          then error ("The first argument of " ++ fname ++ " should have type Nat"
+                   ++ " when using the sized setting")
+          else do
+            ev <- get 
+            xs <- mapM (fvar 0) ts
+            topFrees .= xs
+            return $ App (Fun fid) (intToNat ev n : map FVar xs)
 
 intToNat :: Env Expr -> Int -> Expr
 intToNat ev 0 = Con zer []

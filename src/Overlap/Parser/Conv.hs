@@ -93,7 +93,8 @@ convModule d i m = Env {
              _typeConstr = I.fromList $ map (convData c) (M.toList $ m ^. moduleData),
              _constrNames = c ^. convertCon . mapFromInt,
              _constrIds = c ^. convertCon . mapToInt, 
-             _typeNames = c ^. convertTypes . mapFromInt
+             _typeNames = c ^. convertTypes . mapFromInt,
+             _typeIds = c ^. convertTypes . mapToInt
              }
   where c = setupConvert m
 

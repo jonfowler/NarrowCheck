@@ -15,6 +15,10 @@ checkn i n t = ((depth t <= i) *&&* ordered t && (depthNat t <= s30))
 check :: Nat -> Tree -> Result 
 check n t = checkn s5 n t 
 
+enumCheckn :: Nat -> Tree -> Result 
+enumCheckn i t = ((depth t <= i) && (depthNat t <= s3) *&&* ordered t)
+                                      ==> True
+
 depthNat :: Tree -> Nat
 depthNat Leaf = Z
 depthNat (Node t1 a t2) = max a (max (depthNat t1) (depthNat t2))
