@@ -10,6 +10,7 @@ import Overlap.Lens
 import Overlap.Eval.Monad
 import Overlap.Printer
 import Overlap.Eval.Generate
+import Overlap.Eval.Enumerate
 import System.Random
 import Data.Time
 import Data.Fixed
@@ -37,6 +38,8 @@ data Flag
   | Sized Int
   | PropName String
   | BackTrack Int
+  | Enumerate
+  | DepthBound Int
 
 options :: [OptDescr Flag]
 options =
@@ -48,6 +51,10 @@ options =
       "Input size argument",
     Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
       "Backtrack number",
+    Option ['d'] ["depth"] (ReqArg dep "NUM")
+      "Maximum constructor depth",
+    Option ['e'] ["enumerate"] (NoArg Enumerate)
+      "Enumerate solutions",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No printed output",
     Option ['p'] ["property"] (ReqArg  PropName "String")
@@ -62,6 +69,10 @@ options =
         siz s
           | n >= 0 = Sized n
           | otherwise = error "Size must be postiive"
+          where n = read s
+        dep s
+          | n >= 0 = DepthBound n
+          | otherwise = error "Maximum depth must be postiive"
           where n = read s
         backtr s
           | n >= 0 = BackTrack n
@@ -91,7 +102,7 @@ go fn flags = do
   m' <- P.mergeModules m ms
   P.checkModule m'
   r <- getStdGen
-  let env = C.convModule 100000000 10000000 m'
+  let env = C.convModule 100000000 dataBound m'
       fal = env ^. constrIds . at' "False"
       tr = env ^. constrIds . at' "True"
 
@@ -127,7 +138,7 @@ go fn flags = do
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
 --  print (length . rights $ rs)
     where
---      dataBound = fromMaybe 10000 (listToMaybe [n | DataBound n <- flags])
+      dataBound = fromMaybe 10000 (listToMaybe [n | DepthBound n <- flags])
 --      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       prop = null [() | Generate <- flags] 
