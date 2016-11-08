@@ -1,4 +1,4 @@
-module RedBlack where
+module RedBlackTrad where
 
 import Prelude ()
 import OverlapPrelude
@@ -14,7 +14,7 @@ checkn :: Nat -> Nat -> Nat -> Tree -> Result
 checkn n k a t = redBlackN k t && (k <= n) ==> True -- redBlack (insert a t)
 
 benchmarkn :: Nat -> Tree -> Result
-benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
+benchmarkn n t = redBlackN n t && (depthNat t == Z) && (maxdepth t <= (n+n)) ==> True
 
 
 data Colour = R | B
@@ -22,7 +22,7 @@ data Colour = R | B
 data Tree = E | T Colour Tree Nat Tree
 
 {-# DIST E 1 #-}
-{-# DIST T 3 #-}
+{-# DIST T 1 #-}
 -- Methods
 
 member x E = False
@@ -63,8 +63,8 @@ blackRoot x = False
 -- INVARIANT 1. No red node has a red parent.
 
 red E = True
-red (T col a x b) = ((isRed col) ===> (blackRoot a && blackRoot b)) 
-    && red a && red b
+red (T col a x b) = ((isRed col) ===> (blackRoot a *&&* blackRoot b)) 
+    *&&* red a *&&* red b
 
 -- INVARIANT 2. Every path from the root to an empty node contains the
 -- same number of black nodes.
@@ -83,16 +83,16 @@ black t = fst (black' t)
 black' E = Pair True Z
 black' (T c t1 x t2) = black'' c (black' t1) (black' t2) 
 
-black'' R (Pair b1 m) (Pair b2 n) = Pair (b1 && b2 && (m == n)) (max m n)
-black'' B (Pair b1 m) (Pair b2 n) = Pair (b1 && b2 && (m == n)) (S (max m n))
+black'' R (Pair b1 m) (Pair b2 n) = Pair (b1 *&&* b2 *&&* (m == n)) (max m n)
+black'' B (Pair b1 m) (Pair b2 n) = Pair (b1 *&&* b2 *&&* (m == n)) (S (max m n))
 
 ifB R m n = n 
 ifB B m n = m 
 
 blackN :: Nat -> Tree -> Bool
 blackN Z E = True
-blackN n (T R t1 x t2) = blackN n t1 && blackN n t2
-blackN (S n) (T B t1 x t2) = blackN n t1 && blackN n t2
+blackN n (T R t1 x t2) = blackN n t1 *&&* blackN n t2
+blackN (S n) (T B t1 x t2) = blackN n t1 *&&* blackN n t2
 blackN n t = False
 
 
@@ -103,26 +103,30 @@ div2 (S (S x)) = S (div2 x)
 -- INVARIANT 3. Trees are ordered.
 
 allLE x E = True
-allLE x (T col t0 a t1) = (a <= x) && allLE x t0 && allLE x t1
+allLE x (T col t0 a t1) = (a <= x) *&&* allLE x t0 *&&* allLE x t1
 
 allGE x E = True
-allGE x (T col t0 a t1) = (a >= x) && allGE x t0 && allGE x t1
+allGE x (T col t0 a t1) = (a >= x) *&&* allGE x t0 *&&* allGE x t1
 
 ord E = True
-ord (T col t0 a t1) =  allLE a t0 && allGE a t1 && ord t0 && ord t1
+ord (T col t0 a t1) =  allLE a t0 *&&* allGE a t1 *&&* ord t0 *&&* ord t1
 
 -- Properties
 
 smax E = True
-smax (T c t0 a t1) = a <= s4 && smax t0 && smax t1
+smax (T c t0 a t1) = a <= s4 *&&* smax t0 *&&* smax t1
 
 depthNat :: Tree -> Nat
 depthNat E = Z
 depthNat (T c t0 a t1) = max a (max (depthNat t0) (depthNat t1))
 
-redBlackN k t =  blackRoot t && blackN k t && red t && ord t
+maxdepth :: Tree -> Nat
+maxdepth E = Z
+maxdepth (T c t0 a t1) = S (max (maxdepth t0) (maxdepth t1))
 
-redBlack t =  red t && black t && ord t
+redBlackN k t =  blackRoot t *&&* blackN k t  *&&* red t  *&&* ord t
+
+redBlack t =  red t *&&* black t *&&* ord t
 
 --sizeBlack t n = countBlack t == n
 

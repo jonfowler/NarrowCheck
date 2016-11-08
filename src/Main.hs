@@ -207,7 +207,8 @@ printFailure env = putStrLn $ printXVars (env ^. topFrees) env
 
 
 printResults :: [(Atom, Env Expr)] -> IO ()
-printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
+printResults = mapM_ (\(e,env) -> putStrLn (showAtom env e ++ " ->" ++
+                                       printXVars (env ^. topFrees) env))
 
 printSizedResults :: [(Int, (Int, (Atom, Env Expr)))] -> IO ()
 printSizedResults = mapM_ (\(i ,(j, (e,env))) -> putStrLn (show i ++ " ==> " ++ showAtom env e ++ " ->" ++ printXVars (env ^. topFrees) env))
