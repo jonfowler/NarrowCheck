@@ -2,6 +2,8 @@
 
 This is the proto-type implementation of a overlapping property based testing tool as described in the [Failing Faster paper](https://github.com/JonFowler/overlapCheck/blob/master/FailingFaster.pdf).
 
+The performance supplement for the paper is the file [PerformanceSupplement.pdf](https://github.com/JonFowler/overlapCheck/blob/master/PerformanceSupplement.pdf)
+
 ## Installation:
 
 The easiest way to install is using the [Haskell stack tool](https://docs.haskellstack.org/en/stable/README/#how-to-install) and then running *stack install* in the directory.
