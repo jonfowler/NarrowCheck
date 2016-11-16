@@ -16,6 +16,9 @@ checkn n k a t = redBlackN k t && (k <= n) ==> True -- redBlack (insert a t)
 benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
 
+redBlackn :: Nat -> Tree -> Result
+redBlackn k t = blackRoot t && blackN k t && red t ==> True
+
 
 data Colour = R | B
 

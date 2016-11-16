@@ -1,4 +1,4 @@
-module Expr where
+module ExprTrad where
 
 import Prelude ()
 import OverlapPrelude
@@ -48,8 +48,8 @@ typeAdd u v = NoType
 
 oftype (N u) TypeN = True
 oftype (B v) TypeB = True
-oftype (If e e' e'') t =  oftype e TypeB && oftype e' t && oftype e'' t
-oftype (Add e e') TypeN =  oftype e TypeN && oftype e' TypeN
+oftype (If e e' e'') t =  oftype e TypeB *&&* oftype e' t *&&* oftype e'' t
+oftype (Add e e') TypeN =  oftype e TypeN *&&* oftype e' TypeN
 oftype u v = False
 
 --check :: Expr -> Result
