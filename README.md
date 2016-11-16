@@ -1,4 +1,4 @@
-# overlapCheck
+# OverlapCheck
 
 This is the proto-type implementation of a overlapping property based testing tool as described in the [Failing Faster paper](https://github.com/JonFowler/overlapCheck/blob/master/FailingFaster.pdf).
 
@@ -13,7 +13,7 @@ The easiest way to install is using the [Haskell stack tool](https://docs.haskel
 There examples in the examples directory.
 
 Example use:  
-> overlapCheck Tree.hs  
+> overlapcheck Tree.hs  
 > +++ Ok, successfully passed 100 tests in 2.50s
 
 By default the tool will test the property named *check*. This can
@@ -22,7 +22,7 @@ be altered by using the *property* flag (*-p*).
 The tool can also accept a *size* argument (*--sized*,*-s*). A natural
 number which should be the first argument to the property.
 
-> overlapCheck -p checkn -s5 Tree.hs  
+> overlapcheck -p checkn -s5 Tree.hs  
 > +++ Ok, successfully passed 100 tests in 2.35s
 
 
