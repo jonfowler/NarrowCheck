@@ -3,7 +3,7 @@
 
 name:                OverlapCheck
 version:             0.1.0.0
-synopsis:            Finding test cases which reach target expressions
+synopsis:            Property based testing with narrowing and overlapping patterns
 -- description:         
 -- license:             
 license-file:        LICENSE
@@ -26,8 +26,8 @@ executable overlapcheck
                        random == 1.*,
                        wl-pprint == 1.2,
                        parsers == 0.12.*,
-                       trifecta == 1.6.*,
-                       time == 1.6.*
+                       trifecta == 1.5.*,
+                       time == 1.5.*
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: GeneralizedNewtypeDeriving, 
@@ -56,4 +56,5 @@ executable overlapcheck
     Overlap.Eval.Monad,
     Overlap.Eval.Generate,
     Overlap.Eval.Narrow,
-    Overlap.Eval.Reduce
+    Overlap.Eval.Reduce,
+    Overlap.Eval.Enumerate
