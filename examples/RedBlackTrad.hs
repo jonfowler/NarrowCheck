@@ -17,7 +17,7 @@ benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) && (maxdepth t <= (n+n)) ==> True
 
 redBlackn :: Nat -> Tree -> Result
-redBlackn k t = blackRoot t *&&* blackN k t *&&* red t ==> True
+redBlackn k t = blackRoot t *&&* blackN k t *&&* red t *&&* (maxdepth t <= (k+k)) ==> True
 
 data Colour = R | B
 
