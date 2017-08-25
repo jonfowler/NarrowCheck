@@ -6,8 +6,8 @@ data Bool = True | False deriving Show
 
 data Nat = Z | S Nat deriving Show
 
-{-# DIST Z 1 #-}                              
-{-# DIST S 2 #-}                              
+{-# DIST Z 1 #-}
+{-# DIST S 2 #-}
 
 not False = True
 not True = False
@@ -38,7 +38,7 @@ S x == S y = x == y
 
 x /= y = not (x == y)
 
-if' True x y = x         
+if' True x y = x
 if' False x y = y
 
 {-# OVERLAP (+) #-}
@@ -79,19 +79,19 @@ True || y = True
 x || True = True
 
 {-# OVERLAP (===>) #-}
-True ===> y = y 
+True ===> y = y
 x ===> False = not x
-False ===> y = True 
+False ===> y = True
 x ===> True = True
 
-data Result = NoTest | Fail | Success 
+data Result = NoTest | Fail | Success
 
-False ==> x = NoTest 
+False ==> x = NoTest
 True ==> False = Fail
 True ==> True = Success
 
 s1 = S Z
-s2 = S s1 
+s2 = S s1
 s3 = S s2
 s4 = S s3
 s5 = S s4
@@ -103,6 +103,6 @@ s10 = S s9
 s11 = S s10
 s12 = S s11
 
-s20 = s10 + s10     
+s20 = s10 + s10
 s30 = s20 + s10
-s40 = s20 + s20
+s40 = s30 + s10
