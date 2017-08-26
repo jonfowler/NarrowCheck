@@ -8,6 +8,7 @@ module Overlap.Eval.Monad (
   ) where
 
 import Control.Monad.State as X
+import Control.Monad.Writer as X hiding (Alt) 
 import Control.Monad.Except as X
 import Control.Monad.Identity as X
 import Control.Monad.List
@@ -48,9 +49,9 @@ class (Monad m) => MonadChoice m where
 --  mchoice = foldr (<|>) memp
   mchoice :: MonadChoice m => [(Int, m a)] -> m a
 
-instance MonadChoice Tree where          
-  memp = Branch [] 
-  mchoice ts = Branch ts 
+instance MonadChoice Tree where
+  memp = Branch []
+  mchoice ts = Branch ts
 
 --instance MonadChoice [] where
 --  memp = []

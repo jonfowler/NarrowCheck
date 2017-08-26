@@ -14,10 +14,10 @@ import Overlap.Eval.Enumerate
 import System.Random
 import Data.Time
 import Data.Fixed
-      
+
 import Control.Monad.Except
 
-import Data.Either       
+import Data.Either
 import Data.Maybe
 
 import System.Environment
@@ -26,10 +26,10 @@ import System.IO.Error
 
 import Debug.Trace
 
-data EvalTypes = EvalInterweave       
+data EvalTypes = EvalInterweave
                | EvalBasic
 
-data Flag 
+data Flag
   = GenNum Int
   | NoOutput
   | Generate
@@ -44,9 +44,9 @@ data Flag
 options :: [OptDescr Flag]
 options =
   [ Option ['g'] ["generate"] (NoArg Generate)
-      "Generate test cases (instead of refuting property)", 
+      "Generate test cases (instead of refuting property)",
     Option ['n'] ["number"] (ReqArg number "NUM")
-      "Number of solutions to generate", 
+      "Number of solutions to generate",
     Option ['s'] ["size"] (ReqArg siz "NUM")
       "Input size argument",
     Option ['b'] ["backtrack"] (ReqArg backtr "NUM")
@@ -92,7 +92,7 @@ main = do
 toFileName :: [String] -> FilePath
 toFileName [a] = a ++ ".hs"
 toFileName (a : as) = a ++ "/" ++ toFileName as
-  
+
 go :: FilePath -> [Flag] -> IO ()
 go fn flags = do
   rf <- readFile fn
@@ -110,26 +110,25 @@ go fn flags = do
       sc = env ^. constrIds . at' "Success"
       fl = env ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      genRes = evalState (generating backtrack (return . getSol tr) (runStrat env)) r
-      enumRes = convBool <$> enumerate (getSolProp nt) (runStrat env)
-      propRes = convBool <$>
-                evalState (generating backtrack
-                                      (return . getSolProp nt)
-                                      (runStrat env))
-                           r
+      genRes :: ([(Expr,Env Expr)], Sum Int)
+      genRes = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat env)) r)
+      enumRes = convBool <$> fst (enumerate (getSolProp nt) (runStrat env))
+      propRes = convBool <$> fst (runWriter (evalStateT (generating genNum backtrack
+                                      (getSolProp nt)
+                                      (runStrat env)) r))
       outputProp = do
        x <- getCurrentTime
-       let r = [ z | Left z <- take genNum propRes]
+       let r = [ z | Left z <- propRes]
        case r of
          [] -> do
            x' <- getCurrentTime
            let timetaken = diffUTCTime x' x
            when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2)
-         (z : e) -> 
+         (z : e) ->
            when output $ putStrLn "Failed test:" >> printFailure z
        unless output $ print (length r)
 
-      outputEnum = do 
+      outputEnum = do
         x <- getCurrentTime
         let r = [z | Left z <- enumRes]
         case r of
@@ -137,10 +136,10 @@ go fn flags = do
             x' <- getCurrentTime
             let timetaken = diffUTCTime x' x
             when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++ showDec timetaken 2)
-          (z : e) -> 
+          (z : e) ->
             when output $ putStrLn "Failed test:" >> printFailure z
         unless output $ print (length r)
-       
+
       convBool ((Con cid _), z) | cid == sc = Right z
                                 | cid == fl = Left z
       convBool _ = error "should be true or false"
@@ -148,12 +147,12 @@ go fn flags = do
 
   when showfuncs $ putStrLn (printDoc (printDefs env))
   if prop
-    then if not enum 
+    then if not enum
          then outputProp
          else outputEnum
     else do
-       when output . printResults $ take genNum genRes
-       unless output $ print (length (take genNum genRes))
+       when output . printResults . fst $ genRes
+       unless output . print . length . fst $ genRes
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -163,11 +162,11 @@ go fn flags = do
 --      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
       maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       enum = not (null [() | Enumerate <- flags])
-      prop = null [() | Generate <- flags] 
+      prop = null [() | Generate <- flags]
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
       propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
-      sizeArg = listToMaybe [n | Sized n <- flags] 
+      sizeArg = listToMaybe [n | Sized n <- flags]
 
       setupNarrow = maybe narrowSetup sizedSetup sizeArg
 
@@ -184,7 +183,7 @@ go fn flags = do
       getSolProp _ (Left _, z) = Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
-      evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
+--      evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
 
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
       getSol _ (Right (Con _ _), z) = Nothing
@@ -220,7 +219,6 @@ printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. t
 --           Left (e, env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env)
 --           Right (e, env) -> putStrLn (showAtom env e ++ " ->" ++ printFVars (env ^. topFrees) env))
 
-                                
 
 
 

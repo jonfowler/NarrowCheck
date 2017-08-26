@@ -1,4 +1,4 @@
-module Unify where
+module Union where
 
 import Prelude ()
 import OverlapPrelude
