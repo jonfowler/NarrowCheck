@@ -21,49 +21,8 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Overlap.Lens
-
---type Alts = [Alt Expr]
---type FullAlts = [(Expr, [Alts])]
-----type Expr' = (Atom, [Expr], FullAlts)
---
---data Expr = Expr !Atom ![Expr] !FullAlts
---          | Let LId Expr Expr deriving (Show, Eq)
-
---data Atom = Fun {-# UNPACK #-} !FuncId
---  -- The "local" variables are variables scoped by lambdas, they
---  -- are converted to environment variables when they are bound.
---  | Var {-# UNPACK #-} !LId
---  -- FVar's are the free variables
---  | FVar {-# UNPACK #-} !FId
---
---  | Lam {-# UNPACK #-} !LId Expr
---
---  | Bottom
---  -- A constructors arguments should be atoms: either a variable or
---  -- further atoms. This is for efficiency, ensuring every expression
---  -- is only evaluated once.
---  | Con {-# UNPACK #-} !CId [Atom] deriving (Show, Eq)
-
---toExpr :: [Expr] -> FullAlts -> E.Expr ->  Expr 
---toExpr ap br (E.App e e') = toExpr (toExpr [] [] e' : ap) br e
---toExpr [] ((z , ass) : br) (E.Case e E.Bottom as) = toExpr  [] ((z , as' :ass) : br) e
---   where as' = fmap (toExpr [] []) <$> as
---toExpr [] br (E.Case e z as) = toExpr  [] ((toExpr [] [] z, [fmap (toExpr [] []) <$> as]) : br) e
---toExpr ap br (E.Let x e e') = Let x (toExpr [] [] e) (toExpr ap br e')
---toExpr ap br a = Expr (toAtom a) ap br
---
---toAtom :: E.Expr -> Atom
---toAtom (E.Fun f) = Fun f 
---toAtom (E.Var v) = Var v
---toAtom (E.FVar x) = FVar x
---toAtom E.Bottom = Bottom 
---toAtom (E.Con cid es) = Con cid (toAtom <$> es)
---toAtom (E.Lam v e) = Lam v (toExpr [] [] e)
---
---atom :: Atom -> Expr
---atom a = Expr a [] []
-
-
+import Control.DeepSeq
+import GHC.Generics
 
 data Env a = Env {
   _defs :: IntMap ([Int], Def),
@@ -93,9 +52,11 @@ data Env a = Env {
   _constrIds :: Map String CId,
   _typeNames :: IntMap String,
   _typeIds :: Map String Int
-  } deriving Functor
+  } deriving (Functor, Generic)
 
 makeLenses ''Env
+
+instance NFData a => NFData (Env a)
 
 --showAtom :: Env Expr -> Atom -> String
 --showAtom env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (showAtom env) es)

@@ -14,6 +14,7 @@ import Overlap.Eval.Enumerate
 import System.Random
 import Data.Time
 import Data.Fixed
+import Control.DeepSeq
 
 import Data.Maybe
 
@@ -118,6 +119,7 @@ go fn flags = do
            putStrLn "Failed test:" >> printFailure z
        unless output $ print (length propRes)
        unless output . print $ propResBT
+       unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
 
       outputEnum = do
         x <- getCurrentTime
@@ -131,6 +133,7 @@ go fn flags = do
             when output $ mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
         unless output $ print (length enumRes)
         unless output . print $ enumResBT
+        unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
 
       convBool ((Con cid _), z) | cid == sc = Right z
                                 | cid == fl = Left z
@@ -138,14 +141,17 @@ go fn flags = do
 
 
   when showfuncs $ putStrLn (printDoc (printDefs envir))
+  () <- return (rnf envir)
   if prop
     then if not enum
          then outputProp
          else outputEnum
     else do
+       x <- getCurrentTime
        when output . printResults $ genRes
        unless output . print . length $ genRes
        unless output . print $ genResBT
+       unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)

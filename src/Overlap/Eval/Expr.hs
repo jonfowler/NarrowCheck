@@ -1,6 +1,8 @@
 module Overlap.Eval.Expr where
 
 import qualified Data.IntMap as I
+import GHC.Generics
+import Control.DeepSeq
 
 type LId = Int 
 type CId = Int 
@@ -17,17 +19,21 @@ data Expr
   | Lam !LId Expr
   | Bottom
   | Con !CId [Atom]
-  | Local !FId (I.IntMap Expr) Def deriving (Show)
+  | Local !FId (I.IntMap Expr) Def deriving (Show,Generic)
 
 type Atom = Expr
 
 data Def = Match Int (I.IntMap ()) [Alt] (I.IntMap ()) !(Maybe Def)
-         | Result [Int] Expr deriving (Show)
+         | Result [Int] Expr deriving (Show,Generic)
 
 data Alt = Alt CId [Int] Def
-         | AltDef Def deriving (Show)
+         | AltDef Def deriving (Show,Generic)
 
-atom :: Expr -> Bool            
+instance NFData Expr
+instance NFData Alt
+instance NFData Def
+
+atom :: Expr -> Bool
 atom (Var _) = True
 atom (FVar _) = True
 atom (Lam _ _) = error "lambda should not be tested whether atom is"

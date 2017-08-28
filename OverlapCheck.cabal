@@ -27,7 +27,8 @@ executable overlapcheck
                        wl-pprint == 1.2,
                        parsers == 0.12.*,
                        trifecta == 1.6.*,
-                       time == 1.6.*
+                       time == 1.6.*,
+                       deepseq 
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: GeneralizedNewtypeDeriving, 
@@ -40,6 +41,7 @@ executable overlapcheck
                       DeriveFunctor,
                       DeriveFoldable,
                       DeriveTraversable,
+                      DeriveGeneric,
                       TypeFamilies
   other-modules:  
     Overlap.Printer,
