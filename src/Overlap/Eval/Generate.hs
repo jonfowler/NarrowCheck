@@ -12,18 +12,18 @@ newStdGen = do
   put n
   return n'
 
-generating :: Int -> Int -> (a -> Maybe b) -> Tree a -> StateT StdGen (Writer (Sum Int)) [b]
+generating :: Int -> Int -> (a -> Maybe b) -> Tree a -> StateT StdGen (Writer (Sum Int, Sum Int)) [b]
 generating n bt p = generating' n bt . Just . fmap p
 
 
-generating' :: Int -> Int -> Maybe (Tree (Maybe b)) -> StateT StdGen (Writer (Sum Int)) [b]
+generating' :: Int -> Int -> Maybe (Tree (Maybe b)) -> StateT StdGen (Writer (Sum Int,Sum Int)) [b]
 generating' _ _ Nothing = return []
 generating' n _ _ | n <= 0 = return []
 generating' _ _ (Just (Leaf b)) = return (maybeToList b)
 generating' n bt (Just (Branch bs)) = do
    (b, t) <- brancher bt bs bt []
    case b of
-     Nothing -> generating' n bt (remake t)
+     Nothing -> tell (mempty,Sum 1) >> generating' n bt (remake t)
      Just a -> (a:) <$> generating' (n-1) bt (remake t)
 
 type ZipTree a = [([(Int,Tree a)], Int, [(Int, Tree a)])]
@@ -39,10 +39,10 @@ remake' t ((bs,fq,bs') : ts) = remake' (Branch (bs ++ (fq,t) : bs')) ts
 
 
 brancher :: Int -> [(Int,Tree (Maybe b))] -> Int ->
-                          ZipTree (Maybe b) -> StateT StdGen (Writer (Sum Int)) (Maybe b, ZipTree (Maybe b))
+                          ZipTree (Maybe b) -> StateT StdGen (Writer (Sum Int,Sum Int)) (Maybe b, ZipTree (Maybe b))
 brancher _ [] 0 ts = return (Nothing, ts)
 brancher _ [] _ [] = return (Nothing, [])
-brancher n [] i ((bs,_,bs') : ts) = tell (Sum 1) >> brancher n (bs ++ bs') (i -1) ts
+brancher n [] i ((bs,_,bs') : ts) = tell (Sum 1,mempty) >> brancher n (bs ++ bs') (i -1) ts
 brancher n bs i ts = do
   (xs, (fq, t) : xs') <- splitRand bs
   case t of

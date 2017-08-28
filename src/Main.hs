@@ -12,9 +12,10 @@ import Overlap.Printer
 import Overlap.Eval.Generate
 import Overlap.Eval.Enumerate
 import System.Random
-import Data.Time
+import Data.Time.Clock.POSIX
 import Data.Fixed
 import Control.DeepSeq
+import Text.Printf
 
 import Data.Maybe
 
@@ -102,38 +103,42 @@ go fn flags = do
       sc = envir ^. constrIds . at' "Success"
       fl = envir ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      (genRes, Sum genResBT) = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
-      (enumRes, enumResBT) = enumerate (getSolProp nt) (runStrat envir)
-      (propRes, Sum propResBT) = runWriter (evalStateT (generating genNum backtrack
+      (genRes, (Sum genResBT, Sum genResFails))
+            = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
+      (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
+      (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
                                       (getSolProp nt)
                                       (runStrat envir)) r)
       outputProp = do
-       x <- getCurrentTime
+       x <- getTime
        let r = [ z | Left z <- convBool <$> propRes]
        when output $ case r of
          [] -> do
-           x' <- getCurrentTime
-           let timetaken = diffUTCTime x' x
-           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2
+           x' <- getTime
+           let timetaken = x' - x
+           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken 
          (z : e) ->
            putStrLn "Failed test:" >> printFailure z
        unless output $ print (length propRes)
        unless output . print $ propResBT
-       unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
+       unless output . print $ propResFails
+       unless output  $ printTimeDiff x 
 
       outputEnum = do
-        x <- getCurrentTime
+        x <- getTime
         let r = [z | Left z <- convBool <$> enumRes]
         case r of
           [] -> do
-            x' <- getCurrentTime
-            let timetaken = diffUTCTime x' x
-            when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++ showDec timetaken 2)
+            x' <- getTime
+            let timetaken = x' - x
+            when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++
+                         secs timetaken)
           es ->
             when output $ mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
         unless output $ print (length enumRes)
         unless output . print $ enumResBT
-        unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
+        unless output . print $ enumResFails
+        unless output  $ printTimeDiff x
 
       convBool ((Con cid _), z) | cid == sc = Right z
                                 | cid == fl = Left z
@@ -147,11 +152,12 @@ go fn flags = do
          then outputProp
          else outputEnum
     else do
-       x <- getCurrentTime
+       x <- getTime
        when output . printResults $ genRes
        unless output . print . length $ genRes
        unless output . print $ genResBT
-       unless output  $ getCurrentTime >>= \x' -> print (diffUTCTime x' x)
+       unless output . print $ genResFails
+       unless output  $ printTimeDiff x
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -219,6 +225,34 @@ printFail = mapM_ (\(e,env) -> putStrLn (show e ++ " ->" ++ printXVars (env ^. t
 --           Left (e, env) -> putStrLn (show e ++ " ->" ++ printFVars (env ^. topFrees) env)
 --           Right (e, env) -> putStrLn (showAtom env e ++ " ->" ++ printFVars (env ^. topFrees) env))
 
+
+printTimeDiff :: Double -> IO ()
+printTimeDiff x = do
+  x' <- getTime
+  print (x' - x)
+
+
+getTime :: IO Double
+getTime = (fromRational . toRational) `fmap` getPOSIXTime
+
+secs :: Double -> String
+secs k
+    | k < 0      = '-' : secs (-k)
+    | k >= 1     = k        `with` "s"
+    | k >= 1e-3  = (k*1e3)  `with` "ms"
+    | k >= 1e-6  = (k*1e6)  `with` "us"
+    | k >= 1e-9  = (k*1e9)  `with` "ns"
+    | k >= 1e-12 = (k*1e12) `with` "ps"
+    | otherwise  = printf "%g s" k
+     where with ::  Double -> String -> String
+           with t u | t >= 1e9  = printf "%.4g %s" t u
+                    | t >= 1e6  = printf "%.0f %s" t u
+                    | t >= 1e5  = printf "%.1f %s" t u
+                    | t >= 1e4  = printf "%.2f %s" t u
+                    | t >= 1e3  = printf "%.3f %s" t u
+                    | t >= 1e2  = printf "%.4f %s" t u
+                    | t >= 1e1  = printf "%.5f %s" t u
+                    | otherwise = printf "%.6f %s" t u
 
 
 

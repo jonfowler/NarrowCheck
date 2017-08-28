@@ -72,12 +72,12 @@ showAtom _ e = "Can't show non constructor value: " ++ show e
 printXVar :: Env Expr -> XId ->  String
 printXVar env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ bracket (map (printXVar env) xs)
-  Nothing -> "Z"
+  Nothing -> "_"
 
 printXVar1 :: Env Expr -> XId ->  String
 printXVar1 env x = case env ^. free . at x of
   Just (cid, xs) -> env ^. constrNames . at' cid ++ (concatMap (\a -> " " ++ show a)  xs)
-  Nothing -> "Z"
+  Nothing -> "_"
 
 printXVars1 :: [Int] -> Env Expr -> String
 printXVars1 xs env = concatMap (\x -> show x ++ " -> " ++ printXVar1 env x ++ "\n") xs 
