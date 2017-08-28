@@ -15,31 +15,22 @@ import System.Random
 import Data.Time
 import Data.Fixed
 
-import Control.Monad.Except
-
-import Data.Either
 import Data.Maybe
 
 import System.Environment
 import System.Console.GetOpt
-import System.IO.Error
-
-import Debug.Trace
-
-data EvalTypes = EvalInterweave
-               | EvalBasic
 
 data Flag
   = GenNum Int
   | NoOutput
   | Generate
   | ShowFunctions
-  | NotSized
   | Sized Int
   | PropName String
   | BackTrack Int
   | Enumerate
   | DepthBound Int
+  | BackTrackNum
 
 options :: [OptDescr Flag]
 options =
@@ -102,57 +93,59 @@ go fn flags = do
   m' <- P.mergeModules m ms
   P.checkModule m'
   r <- getStdGen
-  let env = C.convModule 100000000 dataBound m'
-      fal = env ^. constrIds . at' "False"
-      tr = env ^. constrIds . at' "True"
+  let envir = C.convModule 100000000 dataBound m'
+      fal = envir ^. constrIds . at' "False"
+      tr = envir ^. constrIds . at' "True"
 
-      nt = env ^. constrIds . at' "NoTest"
-      sc = env ^. constrIds . at' "Success"
-      fl = env ^. constrIds .at' "Fail"
+      nt = envir ^. constrIds . at' "NoTest"
+      sc = envir ^. constrIds . at' "Success"
+      fl = envir ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      genRes :: ([(Expr,Env Expr)], Sum Int)
-      genRes = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat env)) r)
-      enumRes = convBool <$> fst (enumerate (getSolProp nt) (runStrat env))
-      propRes = convBool <$> fst (runWriter (evalStateT (generating genNum backtrack
+      (genRes, Sum genResBT) = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
+      (enumRes, enumResBT) = enumerate (getSolProp nt) (runStrat envir)
+      (propRes, Sum propResBT) = runWriter (evalStateT (generating genNum backtrack
                                       (getSolProp nt)
-                                      (runStrat env)) r))
+                                      (runStrat envir)) r)
       outputProp = do
        x <- getCurrentTime
-       let r = [ z | Left z <- propRes]
-       case r of
+       let r = [ z | Left z <- convBool <$> propRes]
+       when output $ case r of
          [] -> do
            x' <- getCurrentTime
            let timetaken = diffUTCTime x' x
-           when output (putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2)
+           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ showDec timetaken 2
          (z : e) ->
-           when output $ putStrLn "Failed test:" >> printFailure z
-       unless output $ print (length r)
+           putStrLn "Failed test:" >> printFailure z
+       unless output $ print (length propRes)
+       unless output . print $ propResBT
 
       outputEnum = do
         x <- getCurrentTime
-        let r = [z | Left z <- enumRes]
+        let r = [z | Left z <- convBool <$> enumRes]
         case r of
           [] -> do
             x' <- getCurrentTime
             let timetaken = diffUTCTime x' x
             when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++ showDec timetaken 2)
-          (z : e) ->
-            when output $ putStrLn "Failed test:" >> printFailure z
-        unless output $ print (length r)
+          es ->
+            when output $ mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
+        unless output $ print (length enumRes)
+        unless output . print $ enumResBT
 
       convBool ((Con cid _), z) | cid == sc = Right z
                                 | cid == fl = Left z
       convBool _ = error "should be true or false"
 
 
-  when showfuncs $ putStrLn (printDoc (printDefs env))
+  when showfuncs $ putStrLn (printDoc (printDefs envir))
   if prop
     then if not enum
          then outputProp
          else outputEnum
     else do
-       when output . printResults . fst $ genRes
-       unless output . print . length . fst $ genRes
+       when output . printResults $ genRes
+       unless output . print . length $ genRes
+       unless output . print $ genResBT
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
@@ -167,6 +160,7 @@ go fn flags = do
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
       propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
       sizeArg = listToMaybe [n | Sized n <- flags]
+      btn = not (null [() | BackTrackNum <- flags])
 
       setupNarrow = maybe narrowSetup sizedSetup sizeArg
 

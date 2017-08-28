@@ -46,7 +46,7 @@ brancher n [] i ((bs,_,bs') : ts) = tell (Sum 1) >> brancher n (bs ++ bs') (i -1
 brancher n bs i ts = do
   (xs, (fq, t) : xs') <- splitRand bs
   case t of
-    Leaf (Just b) -> return (Just b, ts)
+    Leaf (Just b) -> return (Just b, (xs, fq,  xs'):ts)
     Leaf Nothing -> brancher n (xs ++ xs') i ts
     Branch bs' -> brancher n bs' (min (i+1) n) ((xs, fq,  xs') : ts)
 

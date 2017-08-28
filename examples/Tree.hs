@@ -8,18 +8,18 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Leaf 1 #-}
 {-# DIST Node 2 #-}
 
-checkn :: Nat -> Nat -> Tree -> Result 
+checkn :: Nat -> Nat -> Tree -> Result
 checkn i n t = (ordered t && (depth t <= i) && (depthNat t <= s30))
-                                      ==> ordered (del n t) 
+                                      ==> ordered (del n t)
 
-check :: Nat -> Tree -> Result 
-check n t = checkn s5 n t 
+check :: Nat -> Tree -> Result
+check n t = checkn s5 n t
 
 
-genn :: Nat -> Tree -> Result
-genn i t = ordered t && (depth t <= i) && (depthNat t <= s30)
+genn :: Nat -> Tree -> Bool
+genn i t = ordered t && (depth t <= i) && (depthNat t <= s2)
 
-enumCheckn :: Nat -> Tree -> Result 
+enumCheckn :: Nat -> Tree -> Result
 enumCheckn i t = (ordered t && (depth t <= i) && (depthNat t <= s3))
                                       ==> True
 
@@ -31,7 +31,7 @@ depthNat :: Tree -> Nat
 depthNat Leaf = Z
 depthNat (Node t1 a t2) = max a (max (depthNat t1) (depthNat t2))
 
-allle i Leaf = True 
+allle i Leaf = True
 allle i (Node t1 x t2) = x <= i && allle i t1 && allle i t2
 
 allge i Leaf = True
@@ -53,7 +53,7 @@ ordered (Node t1 a t2) =  allle a t1 &&
                           allge a t2 &&
                           ordered t2
 
-depth Leaf = Z 
+depth Leaf = Z
 depth (Node t1 x t2) = S (max (depth t1) (depth t2))
 
 --prop_ordDel n t = ord t ==> ord (del n t)
@@ -71,5 +71,5 @@ halfup (S (S x)) = S (halfup x)
 
 halfdown :: Nat -> Nat
 halfdown Z = Z
-halfdown (S Z) = Z 
+halfdown (S Z) = Z
 halfdown (S (S x)) = S (halfdown x)
