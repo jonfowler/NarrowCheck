@@ -115,6 +115,7 @@ convType c (PTypeVar vid) = TVar (case c ^. convertLocals . mapToInt . at vid of
                                      Nothing -> -1
                                      Just v -> v)
 convType c (PTypeApp t t' ) = TApp (convType c t) (convType c t')
+convType c (t :-> t') = TArrow (convType c t) (convType c t')
 
 --  (c ^. convertTypes . mapToInt . at' tid, map convConType cs)
 --   where convConType (cid, n, ts) = (c ^. convertCon . mapToInt . at' cid, n,
