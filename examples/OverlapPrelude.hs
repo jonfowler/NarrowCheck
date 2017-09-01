@@ -110,3 +110,28 @@ s12 = S s11
 s20 = s10 + s10
 s30 = s20 + s10
 s40 = s30 + s10
+
+flip :: (a -> b -> c) -> b -> a -> c 
+flip f b a = f a b
+
+{-
+LIST Functions
+-}
+
+data List a = E | C a (List a)
+
+length :: List a -> Nat
+length E = Z
+length (C a l) = S (length l)
+
+foldr :: (a -> b -> b) -> b -> List a -> b
+foldr f b E = b
+foldr f b (C a l) = f a (foldr f b l)
+
+all :: (a -> Bool) -> List a -> Bool
+all p E = True
+all p (C a l) = p a && all p l
+
+allTrad :: (a -> Bool) -> List a -> Bool
+allTrad p E = True
+allTrad p (C a l) = p a *&&* allTrad p l
