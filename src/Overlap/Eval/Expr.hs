@@ -4,7 +4,6 @@ import qualified Data.IntMap as I
 import GHC.Generics
 import Control.DeepSeq
 import Overlap.Lens
-import Debug.Trace
 
 type LId = Int
 type CId = Int
@@ -20,7 +19,7 @@ data TypeExpr = TVar Int | TGlob Int | TApp TypeExpr TypeExpr deriving (Generic)
 
 applyType :: [Type] -> TypeExpr ->  Type
 applyType _ (TVar (-1)) = Type (-1) []
-applyType ts (TVar i) = trace (show i) $ ts !! i
+applyType ts (TVar i) = ts !! i
 applyType _ (TGlob t) = Type t []
 applyType ts (TApp x y) = let (Type t xs) = applyType ts x in Type t (xs ++ [applyType ts y])
 

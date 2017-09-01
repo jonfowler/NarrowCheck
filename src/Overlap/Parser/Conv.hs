@@ -22,7 +22,6 @@ import Overlap.Parser.PExpr as P
 import Overlap.Eval.Expr
 import Overlap.Eval.Env
 
-import Debug.Trace
 
 data Conv a = Conv
   { _mapToInt :: Map a Int
@@ -103,7 +102,7 @@ convModule d i m = Env {
   where c = setupConvert m
 
 convData :: Convert -> (TypeId, ([VarId], [(ConId, Int, [PType])])) -> (TId, [(CId, Int, [TypeExpr])])
-convData tempc (tid, (vids , cs)) = trace (show vids) (tempc ^. convertTypes . mapToInt . at' tid, map (convDataCon c) cs) 
+convData tempc (tid, (vids , cs)) =  (tempc ^. convertTypes . mapToInt . at' tid, map (convDataCon c) cs) 
    where
       c =  tempc {_convertLocals = execState (setupConv vids) emptyConv}
 
