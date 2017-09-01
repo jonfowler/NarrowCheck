@@ -5,7 +5,7 @@ import Data.IntMap (IntMap)
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
-import Data.List 
+import Data.List
 import Data.Function (on)
 
 import Overlap.Lens
@@ -17,16 +17,18 @@ import Control.Applicative
 
 import Overlap.Parser.Desugar
 import Overlap.Parser.Module
-import Overlap.Parser.PExpr
+import Overlap.Parser.PExpr as P
 
-import Overlap.Eval.Expr       
+import Overlap.Eval.Expr
 import Overlap.Eval.Env
+
+import Debug.Trace
 
 data Conv a = Conv
   { _mapToInt :: Map a Int
   , _mapFromInt ::  IntMap a
   , _nextInt :: Int
-  }
+  } deriving Show
 
 makeLenses ''Conv
 
@@ -35,7 +37,7 @@ data Convert = Convert {
   _convertCon :: Conv ConId,
   _convertLocals :: Conv VarId,
   _convertTypes :: Conv TypeId,
-  _conInfo :: Map ConId Int 
+  _conInfo :: Map ConId Int
                        }
 
 makeLenses ''Convert
@@ -56,18 +58,19 @@ viewCons cid = viewConv convertCon cid
 convCon :: Convert -> VarId -> CId
 convCon c cid = fromMaybe (error "Internal: convCon fail") $ M.lookup cid (c ^. convertCon . mapToInt)
 
-setupConvert :: Module -> Convert 
+
+setupConvert :: Module -> Convert
 setupConvert m = Convert
   { _convertFuncId = execState (setupConv (M.keys $ m ^. moduleDef)) emptyConv,
     _convertCon = execState (setupConv (M.keys $ m ^. moduleCon)) emptyConv,
     _convertTypes = execState (setupConv (M.keys $ m ^. moduleData)) emptyConv,
     _convertLocals = emptyConv,
-    _conInfo = fmap length $ m ^. moduleCon 
+    _conInfo = fmap length $ m ^. moduleCon
   }
 
 setupConv :: Ord a => [a] -> State (Conv a) ()
-setupConv as = foldM_ (\_ v -> overConv id v) 0 as
-                     
+setupConv = foldM_ (\_ v -> overConv id v) 0
+
 convModule :: Int -> Int -> Module -> Env Expr
 convModule d i m = Env {
              _defs = I.fromList $ map (convDef c) (M.toList $ m ^. moduleDef),
@@ -78,6 +81,7 @@ convModule d i m = Env {
              _freeDepth = I.empty,
              _freeType = I.empty,
              _freeCount = 0,
+             _freeNarrowSet = I.empty,
 
              _maxFreeCount = d,
              _maxDepth = i,
@@ -92,42 +96,55 @@ convModule d i m = Env {
 
              _typeConstr = I.fromList $ map (convData c) (M.toList $ m ^. moduleData),
              _constrNames = c ^. convertCon . mapFromInt,
-             _constrIds = c ^. convertCon . mapToInt, 
+             _constrIds = c ^. convertCon . mapToInt,
              _typeNames = c ^. convertTypes . mapFromInt,
              _typeIds = c ^. convertTypes . mapToInt
              }
   where c = setupConvert m
 
-convData :: Convert -> (TypeId, [(ConId, Int, [PType])]) -> (Type, [(CId, Int, [Type])])
-convData c (tid, cs) = (c ^. convertTypes . mapToInt . at' tid, map convConType cs)
-   where convConType (cid, n, ts) = (c ^. convertCon . mapToInt . at' cid, n,
-                                  map (convType c . simpleType) ts)
+convData :: Convert -> (TypeId, ([VarId], [(ConId, Int, [PType])])) -> (TId, [(CId, Int, [TypeExpr])])
+convData tempc (tid, (vids , cs)) = trace (show vids) (tempc ^. convertTypes . mapToInt . at' tid, map (convDataCon c) cs) 
+   where
+      c =  tempc {_convertLocals = execState (setupConv vids) emptyConv}
+
+convDataCon :: Convert -> (ConId, Int, [PType]) -> (CId, Int, [TypeExpr])
+convDataCon c (cid, n, ts) = (c ^. convertCon . mapToInt . at' cid, n, map (convType c) ts)
+
+convType :: Convert -> PType -> TypeExpr
+convType c (PType tid) = TGlob (c ^. convertTypes . mapToInt . at' tid)
+convType c (PTypeVar vid) = TVar (case c ^. convertLocals . mapToInt . at vid of
+                                     Nothing -> -1
+                                     Just v -> v)
+convType c (PTypeApp t t' ) = TApp (convType c t) (convType c t')
+
+--  (c ^. convertTypes . mapToInt . at' tid, map convConType cs)
+--   where convConType (cid, n, ts) = (c ^. convertCon . mapToInt . at' cid, n,
+--                                  map (convType c . simpleType) ts)
 
 convDefArg :: Convert -> (VarId, PType) -> (FId, [Type])
-convDefArg c (vid, t) = (c ^. convertFuncId . mapToInt .at' vid, map (convType c) (getArgs t))
+convDefArg c (vid, t) = (c ^. convertFuncId . mapToInt .at' vid, map (applyType [] . convType c) (getArgs t))
+--
+--convTypeId :: Convert -> TypeId -> Type
+--convTypeId c tid = c ^. convertTypes . mapToInt . at' tid
+--
+--simpleType :: PType -> TypeId
+--simpleType (P.Type tid) = tid
+--
 
-convType :: Convert -> TypeId -> Type
-convType c tid = c ^. convertTypes . mapToInt . at' tid
-
-simpleType :: PType -> TypeId
-simpleType (Type tid) = tid 
-
-getArgs :: PType -> [TypeId]
-getArgs (Type _) = []
-getArgs (Type tid :-> t) = tid : getArgs t
+getArgs :: PType -> [PType]
+getArgs (t :-> t') = t : getArgs t'
+getArgs _ = []
 
 convDef :: Convert -> (VarId, ([PDef], Bool)) -> (FId, ([Int], Def))
 convDef c (vid, (pds, b)) = ( fromMaybe (error "Function not found")
                                    $ c ^. convertFuncId . mapToInt . at vid,
                             ( lvs
                             , (if b then convOverlapDef else convOrderedDef) lvs cps ))
-    where lvs = leadVars bckb 
-          bckb = backbone $ map fst ps 
+    where lvs = leadVars bckb
+          bckb = backbone $ map fst ps
           ps = map ((map (convertCons c) . _defArgs) &&& _defBody)  pds
-          cps = map (convPDef c bckb) ps 
-                            
+          cps = map (convPDef c bckb) ps
 
-          
 --  case runExcept . runStateT newd $ c of
 --  Left e -> error e
 --  Right (d, _) -> (
@@ -314,7 +331,7 @@ usedVars' (Var v) = I.singleton v ()
 usedVars' (Lam v e) = I.insert v () (usedVars' e)
 usedVars' (Con c es) = foldr (\e vs -> I.union (usedVars' e) vs) I.empty es
 usedVars' _ = I.empty
- 
+
 convExpr :: PExpr -> ConvertM Expr
 convExpr (PVar vid) = (Var <$> viewConv convertLocals vid) 
                     <|> (Fun <$> viewConv convertFuncId vid) 
@@ -332,7 +349,7 @@ convExpr (PLam v e) = do
   v' <- overConv convertLocals v
   e' <- convExpr e
   return (Lam v' e')
-  
+
 convExpr (PParens e) = convExpr e
 --convExpr (PCase e as) = Case <$> convExpr e <*> pure Bottom <*> mapM convAlt as
 

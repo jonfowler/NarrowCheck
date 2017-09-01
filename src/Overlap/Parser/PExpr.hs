@@ -24,7 +24,7 @@ data PExpr
   | POpL PExpr OpId
   | POpR OpId PExpr
   deriving (Show)
-     
+
 data PAlt a = PAlt Pattern a deriving (Show, Functor)
 
 data Pattern' a b = PatCon a [Pattern' a b]
@@ -45,9 +45,11 @@ data PDef = PDef {_defArgs :: [Pattern], _defBody :: PExpr} deriving (Show)
 makeLenses ''PDef
 
 data PType = PType :-> PType
-          | Type TypeId deriving (Show)
+          | PTypeApp PType PType
+          | PTypeVar String
+          | PType TypeId deriving (Show)
 
-type PData = (TypeId, [(ConId, Int, [PType])])
+type PData = (TypeId, [VarId] , [(ConId, Int, [PType])])
 
   --PData {_dataName :: TypeId, _dataCon :: [(ConId, [PType])]} deriving (Show)
 --makeLenses ''PData

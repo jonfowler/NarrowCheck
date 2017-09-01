@@ -53,7 +53,7 @@ parseTypeId = lexeme $ ((:) <$> upper <*> many alphaNum)
 
 -- Reserved names
 reservedT :: [String]
-reservedT = ["case", "of", "data", "import", "let", "in", "module", "where"]
+reservedT = ["case", "of", "data", "import", "let", "in", "module", "where", "deriving"]
 
 -- Parse a non reserved lower case word
 notReserved :: Parser String 

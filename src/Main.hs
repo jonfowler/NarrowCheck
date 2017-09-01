@@ -165,7 +165,6 @@ go fn flags = do
     where
       dataBound = fromMaybe 10000 (listToMaybe [n | DepthBound n <- flags])
 --      constBound = fromMaybe 1000000 (listToMaybe [n | ConstBound n <- flags])
-      maxsize = fromMaybe 100 (listToMaybe [n | Sized n <- flags])
       enum = not (null [() | Enumerate <- flags])
       prop = null [() | Generate <- flags]
       genNum = fromMaybe 100 (listToMaybe [n | GenNum n <- flags])

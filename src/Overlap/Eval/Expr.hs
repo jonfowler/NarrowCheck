@@ -3,12 +3,30 @@ module Overlap.Eval.Expr where
 import qualified Data.IntMap as I
 import GHC.Generics
 import Control.DeepSeq
+import Overlap.Lens
+import Debug.Trace
 
-type LId = Int 
-type CId = Int 
+type LId = Int
+type CId = Int
 type FId = Int
 type XId = Int
-type Type = Int
+
+type TId = Int
+
+data Type = Type TId [Type] deriving (Generic)
+
+data TypeExpr = TVar Int | TGlob Int | TApp TypeExpr TypeExpr deriving (Generic)
+
+
+applyType :: [Type] -> TypeExpr ->  Type
+applyType _ (TVar (-1)) = Type (-1) []
+applyType ts (TVar i) = trace (show i) $ ts !! i
+applyType _ (TGlob t) = Type t []
+applyType ts (TApp x y) = let (Type t xs) = applyType ts x in Type t (xs ++ [applyType ts y])
+
+data NarrowSet = Narrow {_getNarrowSet :: [(CId,Int,[NarrowSet])]} deriving (Generic)
+
+makeLenses ''NarrowSet
 
 data Expr
   = Let !LId Expr Expr
@@ -32,6 +50,9 @@ data Alt = Alt CId [Int] Def
 instance NFData Expr
 instance NFData Alt
 instance NFData Def
+instance NFData TypeExpr
+instance NFData Type
+instance NFData NarrowSet
 
 atom :: Expr -> Bool
 atom (Var _) = True

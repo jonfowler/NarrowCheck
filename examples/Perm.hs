@@ -3,17 +3,18 @@ module Perm where
 import Prelude ()
 import OverlapPrelude
 
-data List = E | C Nat List 
+data List a = E | C a (List a)
 
-checkn :: Nat -> List -> Result
+checkn :: Nat -> List Nat -> Result
 checkn n l = perm n l ==> True
 
-check :: List -> Result
-check l = checkn s9 l 
+check :: List Nat -> Result
+check l = checkn s9 l
 
-genn :: Nat -> List -> Bool
+genn :: Nat -> List Nat -> Bool
 genn n l = perm n l
 
+length :: List a -> Nat
 length E = Z
 length (C a l) = S (length l)
 

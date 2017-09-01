@@ -14,7 +14,7 @@ module Overlap.Eval.Env
 --  showAtom, printFVar, printFVar1)
   where
 
-import Overlap.Eval.Expr 
+import Overlap.Eval.Expr
 
 import qualified Data.IntMap as I
 import Data.IntMap (IntMap)
@@ -32,6 +32,7 @@ data Env a = Env {
   _nextFVar :: !FId,
   _freeDepth :: IntMap Int,
   _freeType :: IntMap Type,
+  _freeNarrowSet :: IntMap NarrowSet,
 
   _freeCount :: Int,
 
@@ -43,8 +44,7 @@ data Env a = Env {
 --  _nextEVar :: !EId,
   _nextLVar :: !LId,
 
-  _typeConstr :: IntMap [(CId, Int, [Type])],
-
+  _typeConstr :: IntMap [(CId, Int, [TypeExpr])],
 
   _funcNames :: IntMap String,
   _funcIds :: Map String FId,

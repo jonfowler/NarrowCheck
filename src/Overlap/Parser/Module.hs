@@ -18,8 +18,8 @@ module Overlap.Parser.Module (
 import Text.Trifecta.Result
 import Text.Parser.Combinators
 
-import Overlap.Parser.Tokens 
-import Overlap.Parser.Parse 
+import Overlap.Parser.Tokens
+import Overlap.Parser.Parse
 import Overlap.Parser.PExpr
 
 import Control.Arrow
@@ -35,8 +35,8 @@ import Control.Applicative
 data Module = Module
   {_moduleName :: [String],
    _moduleImports :: [[String]],
-   _moduleData :: Map TypeId [(ConId, Int, [PType])],
-   _moduleDef :: Map VarId ([PDef], Bool),  
+   _moduleData :: Map TypeId ([TypeId] ,[(ConId, Int, [PType])]),
+   _moduleDef :: Map VarId ([PDef], Bool),
    _moduleTypeDef :: Map VarId PType,
    _moduleCon :: Map ConId (TypeId, [PType])
   } deriving (Show)
@@ -65,8 +65,6 @@ mergeModule' m n | null dataIntersect && null defIntersect
                         _moduleCon = M.union (m ^. moduleCon) (n ^. moduleCon)
                        }
                  | otherwise = fail "error overlapping namespaces"
-                     
-
   where
     dataIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
     defIntersect = M.intersection (m ^. moduleData) (n ^. moduleData)
@@ -76,11 +74,11 @@ mergeModule' m n | null dataIntersect && null defIntersect
 
 
 addData :: PData -> StateT Module (Except String) ()
-addData (tid, d) = do
+addData (tid, tvars, d) = do
   a <- use (moduleData . at tid)
   case a of
     Just _ -> throwError $ "Type "++ tid ++ " already defined\n"
-    Nothing -> do moduleData . at tid ?= d
+    Nothing -> do moduleData . at tid ?= (tvars,d)
                   sequence_ (uncurry addCon <$> zip (repeat tid) d)
 
 addImport :: [String] -> StateT Module (Except String) ()
@@ -120,7 +118,7 @@ addCon tid (cid, _, ts) = do
 ----add
 --
 conToType :: (ConId, [PType]) -> TypeId -> PType
-conToType (_, ts) tid = foldr (:->) (Type tid) ts
+conToType (_, ts) tid = foldr (:->) (PType tid) ts
 
 parserOfModule :: Parser (Except String Module)
 parserOfModule = do
@@ -138,7 +136,7 @@ addPragmas p m = foldr addPragma m p
 addPragma :: Pragma -> Module -> Module  
 addPragma (Overlap p) m = moduleDef . ix p . _2 .~ True $ m
 addPragma (Dist c n) m = case m ^. moduleCon . at c of
-   Just (t, _) -> moduleData . ix t %~ changeFreq $ m
+   Just (t, _) -> moduleData . ix t . _2 %~ changeFreq $ m
       where changeFreq [] = []
             changeFreq ((cid, f, ts) : cs) | cid == c = (cid, n, ts) : cs
             changeFreq (c1 : cs) = c1 : changeFreq cs
@@ -178,19 +176,19 @@ checkTypeDef m f = case M.lookup f (m ^. moduleDef) of
   Nothing -> throwError $ "Type definition for " ++ f ++ " has no corresponding definiton\n"
   Just _ -> return () 
 
-checkTypeScopes :: Module -> Except String ()
-checkTypeScopes m = do
-  mapMOf_ (moduleData . folded . folded . _3 . folded) (checkTypeScope m) m
-  mapMOf_ (moduleTypeDef . folded) (checkTypeScope m) m
-
---checkTypeScopes :: Module -> Except String Module
---checkTypeScopes m = foldM checkTypeScope m (view  <$> m ^. moduleData)
-
-checkTypeScope :: Module -> PType -> Except String ()
-checkTypeScope m (s :-> t) =  checkTypeScope m s >> checkTypeScope m t
-checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
-  Just _ -> return () 
-  Nothing -> throwError $ "Type " ++ tid ++ " not in scope\n"
+--checkTypeScopes :: Module -> Except String ()
+--checkTypeScopes m = do
+--  mapMOf_ (moduleData . folded . folded . _3 . folded) (checkTypeScope m) m
+--  mapMOf_ (moduleTypeDef . folded) (checkTypeScope m) m
+--
+----checkTypeScopes :: Module -> Except String Module
+----checkTypeScopes m = foldM checkTypeScope m (view  <$> m ^. moduleData)
+--
+--checkTypeScope :: Module -> PType -> Except String ()
+--checkTypeScope m (s :-> t) =  checkTypeScope m s >> checkTypeScope m t
+--checkTypeScope m (Type tid) = case M.lookup tid (m ^. moduleData) of
+--  Just _ -> return () 
+--  Nothing -> throwError $ "Type " ++ tid ++ " not in scope\n"
 
 checkScopes :: Module -> Except String ()
 checkScopes m = mapMOf_ (moduleDef . folded . _1 . folded) (checkScopeDef m) m 

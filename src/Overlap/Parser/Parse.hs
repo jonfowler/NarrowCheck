@@ -3,15 +3,10 @@ module Overlap.Parser.Parse where
 import Control.Applicative
 import Text.Parser.Char
 import Text.Parser.Combinators
-import Text.Trifecta.Result
-import Text.Trifecta.Combinators
-import Text.Trifecta.Delta
-import qualified Text.Trifecta.Parser as T
 
 import Overlap.Parser.Tokens
 import Overlap.Parser.PExpr
 
-import Control.Lens
 
 --data Con a = Con {_conName :: ConId, _conArgs :: [a]} deriving (Show)
 --makeLenses ''Con
@@ -34,12 +29,13 @@ parseData = do
   try (top "data")
   strictIndent
   tid <- parseTypeId
+  vs <- many (strictIndent >> parseVarId)
   res "="
-  ds <- sepBy1 (strictIndent >> parseCon parseType) (res "|")
+  ds <- sepBy1 (strictIndent >> parseCon parseInnerType) (res "|")
   optional (res "deriving" >> many (strictIndent >> anyChar) >> whitespace)
-  return (tid, map (\(c,ts) -> (c,1,ts)) ds)
+  return (tid, vs , map (\(c,ts) -> (c,1,ts)) ds)
 
-parseModuleHead :: Parser [String]            
+parseModuleHead :: Parser [String]
 parseModuleHead = try (top "module") >> parseModuleName <* lexeme (string "where")
 
 parseImport :: Parser (Maybe [String])
@@ -51,8 +47,6 @@ parseImport = do
   case o of
     Nothing -> return (Just n)
     Just _ -> return Nothing
-    
-              
 
 parseModuleName :: Parser [String]
 parseModuleName = lexeme (sepBy1 ((:) <$> upper <*> many alphaNum) (char '.'))
@@ -60,17 +54,23 @@ parseModuleName = lexeme (sepBy1 ((:) <$> upper <*> many alphaNum) (char '.'))
 parseCon :: Parser a -> Parser (ConId, [a])
 parseCon p = tuple <$> parseConId <*> many (strictIndent >> p)
 
+tuple :: a -> b -> (a,b)
 tuple a b = (a,b)
-      
-parseTypeDef :: Parser (VarId, PType) 
+
+
+parseTypeDef :: Parser (VarId, PType)
 parseTypeDef = sameIndent >> tuple <$> parseVarId <* res "::" <*> parseType
 
 parseType :: Parser PType
-parseType = foldr1 (:->) <$> sepBy1 (parseInnerType) (res "->")
+parseType = foldr1 (:->) <$> sepBy1 parseTypeApp (res "->")
+
+parseTypeApp :: Parser PType
+parseTypeApp = toApp PTypeApp <$> some parseInnerType
 
 parseInnerType :: Parser PType
 parseInnerType = strictIndent >> (between (res "(") (res ")") parseType
-               <|> Type <$> parseTypeId)
+                             <|> try (PType <$> parseTypeId)
+                             <|> try (PTypeVar <$> parseVarId))
 
 
 
@@ -107,10 +107,10 @@ parseInnerPattern = (PatCon <$> parseConId <*> many (strictIndent >> parsePatter
                  <|> parsePattern
 
 parseExpr :: Parser PExpr
-parseExpr = ($ id) <$> parseExpr'  
+parseExpr = ($ id) <$> parseExpr'
 
 parseExpr' ::  Parser ((PExpr -> PExpr) -> PExpr)
-parseExpr' = chainl1' (parseApp) parseOp 
+parseExpr' = chainl1' parseApp parseOp 
 
 -- parseCase <|>              
 
@@ -128,7 +128,7 @@ parseAlt = PAlt <$> try parseInnerPattern
                <*> (res "->" *> parseExpr)
 
 parseApp :: Parser PExpr
-parseApp = toApp <$> some parseInnerExpr
+parseApp = toApp PApp <$> some parseInnerExpr
 
 parseInnerExpr :: Parser PExpr
 parseInnerExpr = strictIndent >> (    try (PVar <$> parseVarId) 
@@ -225,9 +225,9 @@ sortParens (Right (o, Just e)) = POpR o e
 --parseCase = Case <$> (try (res "case") *> parseExpr)
 --                 <*> (res "of" *> block parseAlt)
 --
-toApp :: [PExpr] -> PExpr
-toApp = go . reverse
+toApp :: (a->a->a) -> [a] -> a 
+toApp f = go . reverse
   where go [e] = e
-        go (e : es) = PApp (go es) e
+        go (e : es) = f (go es) e
 
 

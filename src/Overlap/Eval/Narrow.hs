@@ -31,9 +31,15 @@ narrowSetup fname = do
                              ++ " function does not have a type"
         Just tid -> do
           ts <- use (defArgTypes . at' fid)
-          xs <- mapM (fvar 0) ts
+          e <- use typeConstr 
+          xs <- mapM (fvar 0) $ map (narrowSet e) ts
           topFrees .= xs
           return $ App (Fun fid) (FVar <$> xs)
+
+narrowSet :: IntMap [(CId, Int, [TypeExpr])] -> Type -> NarrowSet
+narrowSet e (Type tid ts) = Narrow . map narrowCid $ e ^. at' tid
+  where narrowCid (cid,n,tes) = (cid,n, map (narrowSet e . applyType ts) tes)
+
 
 sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
 sizedSetup n fname = do
@@ -41,14 +47,15 @@ sizedSetup n fname = do
     case fid' of
       Nothing -> error $ "The property " ++ fname ++ " does not have a type"
       Just fid -> do
-        (t : ts) <- use (defArgTypes . at' fid)
+        (Type t [] : ts) <- use (defArgTypes . at' fid)
         tid <- use (typeIds . at' "Nat")
         if (tid /= t)
           then error ("The first argument of " ++ fname ++ " should have type Nat"
                    ++ " when using the sized setting")
           else do
             ev <- get 
-            xs <- mapM (fvar 0) ts
+            e <- use typeConstr 
+            xs <- mapM (fvar 0) $ map (narrowSet e) ts
             topFrees .= xs
             return $ App (Fun fid) (intToNat ev n : map FVar xs)
 
@@ -76,8 +83,7 @@ choose x = do
   maxc <- use maxFreeCount
   when (maxc < c) (throwError DataLimitFail)
   when (maxd <= d) (throwError DataLimitFail)
-  t <- use (freeType . at' x)
-  as <- use (typeConstr . at' t)
+  as <- use (freeNarrowSet . at' x . getNarrowSet)
   (cid, ts) <-  mchoice (map (\(cid, n, ts) -> (n, pure (cid, ts))) as)
 
 --  ev <- get
@@ -88,12 +94,12 @@ choose x = do
   env <- get
   return (cid,xs)
 
-fvar :: Monad m => Int -> Type -> OverlapT m FId
+fvar :: Monad m => Int -> NarrowSet -> OverlapT m FId
 fvar d t = do
   x <- use nextFVar
   nextFVar += 1
   freeDepth . at x ?= d
-  freeType . at x ?= t
+  freeNarrowSet . at x ?= t
   return x
 
  
