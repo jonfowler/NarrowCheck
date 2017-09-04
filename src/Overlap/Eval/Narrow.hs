@@ -14,13 +14,44 @@ import qualified Data.IntMap as I
 import Data.IntMap (IntMap)
 import Data.Maybe
 
-import Debug.Trace
-
 runOverlap :: Monad m => OverlapT m a -> Env Expr -> m (Either OverlapFail a , Env Expr)
 runOverlap m = runStateT (runExceptT m)
 
 narrowSetup :: Monad m => String -> OverlapT m Expr
 narrowSetup fname = do
+          (fid, ts) <- getFunc fname
+          e <- use typeConstr
+          xs <- mapM (fvar 0 . narrowSet e) ts
+          topFrees .= xs
+          return $ App (Fun fid) (FVar <$> xs)
+
+narrowSet :: IntMap [(CId, Int, [TypeExpr])] -> Type -> NarrowSet
+narrowSet e (Type tid ts) = Narrow . map narrowCid $ e ^. at' tid
+  where narrowCid (cid,n,tes) = (cid,n, map (narrowSet e . applyType ts) tes)
+
+basicSetup :: MonadChoice m => Int -> String -> OverlapT m Expr
+basicSetup n fname = do
+  (fid, ts) <- getFunc fname
+  es <- mapM (generateType n) ts
+  return $ App (Fun fid) es
+
+generateType :: MonadChoice m => Int -> Type -> OverlapT m Expr
+generateType 0 _ = return Bottom
+generateType n (Type tid ts) = do
+  cs <- use (typeConstr . at' tid)
+  (cid, tes)   <- mchoice (map (\(cid, fq, tes) -> (fq, pure (cid, tes))) cs)
+  es <- mapM (generateType (n-1) . applyType ts) tes
+  return (Con cid es)
+
+--generateType n (Type tid ts) = do
+--   cs <- use (typeConstr . at' tid)
+--   mapM gogenerate cs
+--   where gogenerate (cid, fq, )
+
+
+
+getFunc :: Monad m => String -> OverlapT m (FId, [Type])
+getFunc fname = do
   fid' <- use (funcIds . at fname)
   case fid' of
     Nothing -> error $ "The " ++ fname ++ " function is not defined"
@@ -29,33 +60,20 @@ narrowSetup fname = do
       case ts' of
         Nothing -> error $ "The " ++ fname
                              ++ " function does not have a type"
-        Just tid -> do
-          ts <- use (defArgTypes . at' fid)
-          e <- use typeConstr 
-          xs <- mapM (fvar 0) $ map (narrowSet e) ts
-          topFrees .= xs
-          return $ App (Fun fid) (FVar <$> xs)
-
-narrowSet :: IntMap [(CId, Int, [TypeExpr])] -> Type -> NarrowSet
-narrowSet e (Type tid ts) = Narrow . map narrowCid $ e ^. at' tid
-  where narrowCid (cid,n,tes) = (cid,n, map (narrowSet e . applyType ts) tes)
+        Just ts -> return (fid,ts)
 
 
 sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
 sizedSetup n fname = do
-    fid' <- use (funcIds . at fname)
-    case fid' of
-      Nothing -> error $ "The property " ++ fname ++ " does not have a type"
-      Just fid -> do
-        (Type t [] : ts) <- use (defArgTypes . at' fid)
+        (fid, Type t _ : ts) <- getFunc fname
         tid <- use (typeIds . at' "Nat")
-        if (tid /= t)
+        if tid /= t
           then error ("The first argument of " ++ fname ++ " should have type Nat"
                    ++ " when using the sized setting")
           else do
-            ev <- get 
-            e <- use typeConstr 
-            xs <- mapM (fvar 0) $ map (narrowSet e) ts
+            ev <- get
+            e <- use typeConstr
+            xs <- mapM (fvar 0 . narrowSet e) ts
             topFrees .= xs
             return $ App (Fun fid) (intToNat ev n : map FVar xs)
 
@@ -68,10 +86,10 @@ intToNat ev n = Con su [intToNat ev (n-1)]
 narrow :: MonadChoice m => Maybe Int -> Expr -> OverlapT m Expr
 narrow cx e = do
    c <- reduce cx [] e
-   case c of 
+   case c of
      Fin a -> return a
      Susp (x : _) e -> do
-       (cid, xs) <- choose x
+       _ <- choose x
        narrow (Just x) e
 
 choose :: MonadChoice m => XId -> OverlapT m (CId, [FId])

@@ -6,11 +6,6 @@ import Overlap.Eval.Monad
 import Overlap.Lens
 
 import Data.Maybe
-import Data.List hiding (nub)
-
-import Overlap.Printer
-
-import Debug.Trace
 
 import qualified Data.IntMap as I
 
@@ -24,7 +19,6 @@ type Susp = Susp' Expr Expr
 --  env <- get
 --  trace (printDoc (printState (if null as then e else App e as) env)) $ reduce reduceTrace as e 
 
-           
 reduce :: Monad m => Maybe Int -> [Expr] -> Expr ->  OverlapT m Susp
 
 reduce cx as (Let v e e') = bind v e >> reduce cx as e'
@@ -93,6 +87,7 @@ reduceLocal cx fid vm (Match i sxs alts solxs ol) = do
         Fin (Con cid es) ->  do
           (vs, d) <- matcher fid cid alts 
           reduceLocal cx fid (I.union (I.fromList $ zip vs es) vm) d 
+        Fin Bottom -> return $ Fin Bottom
         Susp x e' -> reduceOverlap (I.insert i e' vm) x (toSuspMap x) 
     False -> reduceOverlap vm (I.keys sxs) sxs
 

@@ -11,6 +11,7 @@ import Control.Monad.State as X
 import Control.Monad.Writer as X hiding (Alt) 
 import Control.Monad.Except as X
 import Control.Monad.Identity as X
+import Control.Monad.Reader as X
 import Control.Monad.List
 
 import Data.Maybe

@@ -32,7 +32,7 @@ data Flag
   | BackTrack Int
   | Enumerate
   | DepthBound Int
-  | BackTrackNum
+  | Basic
 
 options :: [OptDescr Flag]
 options =
@@ -48,6 +48,8 @@ options =
       "Maximum constructor depth",
     Option ['e'] ["enumerate"] (NoArg Enumerate)
       "Enumerate solutions",
+    Option [] ["basic"] (NoArg Basic)
+      "Basic Strategy",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No printed output",
     Option ['p'] ["property"] (ReqArg  PropName "String")
@@ -122,7 +124,7 @@ go fn flags = do
        unless output $ print (length propRes)
        unless output . print $ propResBT
        unless output . print $ propResFails
-       unless output  $ printTimeDiff x 
+       unless output  $ printTimeDiff x
 
       outputEnum = do
         x <- getTime
@@ -135,7 +137,7 @@ go fn flags = do
                          secs timetaken)
           es ->
             when output $ mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
-        unless output $ print (length enumRes)
+        unless output . print $ length enumRes
         unless output . print $ enumResBT
         unless output . print $ enumResFails
         unless output  $ printTimeDiff x
@@ -171,27 +173,29 @@ go fn flags = do
       backtrack = fromMaybe 3 (listToMaybe [n | BackTrack n <- flags])
       propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
       sizeArg = listToMaybe [n | Sized n <- flags]
-      btn = not (null [() | BackTrackNum <- flags])
+      basicStrat = not (null [() | Basic <- flags])
 
       setupNarrow = maybe narrowSetup sizedSetup sizeArg
 
-      runStrat env = runOverlap (setupNarrow propName
-                                     >>= narrow Nothing) env
+      runStrat = if basicStrat then runOverlap (basicSetup dataBound propName >>= narrow Nothing)
+                               else runOverlap (setupNarrow propName >>= narrow Nothing)
  --     runSizedStrat env i = runOverlap (narrowSizedSetup i propName >>= narrow Nothing) env
 
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
 --      refute = not (null [() | Refute <- flags])
 
-      getSolProp nt (Right (Con cid es), z) | cid == nt = Nothing
+      getSolProp nt (Right (Con cid _), _) | cid == nt = Nothing
       getSolProp _ (Right (Con cid' es), z) = Just $ (Con cid' es, z)
-      getSolProp _ (Left _, z) = Nothing
+      getSolProp _ (Left _, _) = Nothing
+      getSolProp _ (Right Bottom, _) = Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
 --      evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
 
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
       getSol _ (Right (Con _ _), z) = Nothing
+      getSol _ (Right Bottom, _) = Nothing
       getSol _ (Left _, z) = Nothing
       getSol _ (e, _) = error $ "Internal: not evaluated " ++ show e
 
