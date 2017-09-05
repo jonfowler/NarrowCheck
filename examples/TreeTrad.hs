@@ -19,7 +19,10 @@ checkn i n t = (ordered t && (depth t <= i) && (depthNat t <= s30))
 check :: Nat -> Tree -> Result 
 check n t = checkn s5 n t 
 
-genn :: Nat -> Tree -> Result
+checkBasic :: Nat -> Tree -> Result
+checkBasic n t = ordered t ==> ordered (del n t)
+
+genn :: Nat -> Tree -> Bool
 genn i t = ordered t && (depth t <= i) && (depthNat t <= s30)
 
 enumCheckn :: Nat -> Tree -> Result 

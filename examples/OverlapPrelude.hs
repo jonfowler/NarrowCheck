@@ -111,18 +111,34 @@ s20 = s10 + s10
 s30 = s20 + s10
 s40 = s30 + s10
 
-flip :: (a -> b -> c) -> b -> a -> c 
+flip :: (a -> b -> c) -> b -> a -> c
 flip f b a = f a b
 
 {-
 LIST Functions
 -}
 
-data List a = E | C a (List a)
+data Tuple a b = T a b deriving Show
+
+fst :: Tuple a b -> a
+fst (T a b) = a
+
+snd :: Tuple a b -> b
+snd (T a b) = b
+
+data List a = E | C a (List a) deriving Show
+
+data Maybe a = Nothing | Just a deriving Show
+
+a +: l = C a l
 
 length :: List a -> Nat
 length E = Z
 length (C a l) = S (length l)
+
+null :: List a -> Bool
+null E = True
+null l = False
 
 foldr :: (a -> b -> b) -> b -> List a -> b
 foldr f b E = b
@@ -135,3 +151,24 @@ all p (C a l) = p a && all p l
 allTrad :: (a -> Bool) -> List a -> Bool
 allTrad p E = True
 allTrad p (C a l) = p a *&&* allTrad p l
+
+lookup :: Nat -> (List (Tuple Nat b)) -> Maybe b
+lookup n E = Nothing
+lookup n (C (T n' b) l) = if' (n == n') (Just b) (lookup n l)
+
+singleton :: a -> List a
+singleton a = C a E
+
+eqList :: (a -> a -> Bool) -> List a -> List a -> Bool
+eqList p E E = True
+eqList p (C a l) (C a' l') = p a a' && eqList p l l'
+eqList p a b = False
+
+eqListTrad :: (a -> a -> Bool) -> List a -> List a -> Bool
+eqListTrad p E E = True
+eqListTrad p (C a l) (C a' l') = p a a' *&&* eqListTrad p l l'
+eqListTrad p a b = False
+
+
+E ++ l = l
+(C a l) ++ l' = C a (l ++ l')

@@ -55,7 +55,7 @@ reduce cx [] (Lam v e) = return . Fin $ Lam v e
 
 reduce cx (a : as) (Lam v e) = bind v a >> reduce cx as e
 
-reduce cx _ Bottom = return . Fin $ Bottom
+reduce cx _ Bottom = throwError DataLimitFail
 
 reduce cx [] (Con cid es) = return . Fin $ Con cid es
 
@@ -82,12 +82,12 @@ reduceLocal cx fid vm (Match i sxs alts solxs ol) = do
   let e = fromMaybe (error "reduceLocal variable not in map") $ I.lookup i vm  
   case I.null sxs || maybe True (flip I.member sxs) cx of
     True -> do
-      a <- reduce cx [] e 
+      a <- reduce cx [] e
       case a of
         Fin (Con cid es) ->  do
           (vs, d) <- matcher fid cid alts 
           reduceLocal cx fid (I.union (I.fromList $ zip vs es) vm) d 
-        Fin Bottom -> return $ Fin Bottom
+        Fin Bottom -> throwError DataLimitFail
         Susp x e' -> reduceOverlap (I.insert i e' vm) x (toSuspMap x) 
     False -> reduceOverlap vm (I.keys sxs) sxs
 

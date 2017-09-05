@@ -9,8 +9,8 @@ import OverlapPrelude
 check :: List Nat -> List Nat -> Result
 check l l' = gen l l'  ==> set (union l l')
 
-basic :: List Nat -> List Nat -> Result
-basic l l' = normaliseList l *&&* normaliseList l' ==*> check l l'
+checkBasic :: List Nat -> List Nat -> Result 
+checkBasic l l' = gen l l'  ==> set (union l l')
 
 gen :: List Nat -> List Nat -> Bool
 gen l l' = set l *&&* set l'

@@ -187,7 +187,7 @@ go fn flags = do
 
       getSolProp nt (Right (Con cid _), _) | cid == nt = Nothing
       getSolProp _ (Right (Con cid' es), z) = Just $ (Con cid' es, z)
-      getSolProp _ (Left _, _) = Nothing
+      getSolProp _ (Left e, _) = Nothing
       getSolProp _ (Right Bottom, _) = Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
@@ -196,6 +196,7 @@ go fn flags = do
       getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
       getSol _ (Right (Con _ _), z) = Nothing
       getSol _ (Right Bottom, _) = Nothing
+      getSol _ (Left DataLimitFail, z) = Nothing
       getSol _ (Left _, z) = Nothing
       getSol _ (e, _) = error $ "Internal: not evaluated " ++ show e
 
