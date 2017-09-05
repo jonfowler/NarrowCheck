@@ -9,13 +9,6 @@ data Char = U | V | W | X | Y deriving Show
 checkBasic :: List Char -> Result
 checkBasic l = not (null l) ==> eqListTrad (=|=) l (encdec l (hufftree l)) 
 
-checkSilly :: List Char -> Result
-checkSilly E = True ==> True 
-checkSilly (C a l) = (a =|= a) ==*> checkSilly l
-
-checkSilly2 :: List Char -> Result
-checkSilly2 l = True ==> eqListTrad (=|=) l l
-
 encdec :: List Char -> Tree -> List Char
 encdec l t = decode t (encode t l)
 
