@@ -107,7 +107,8 @@ go fn flags = do
 --      rs = pullfst <$> runStrat env
       (genRes, (Sum genResBT, Sum genResFails))
             = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
-      (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
+  --    (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
+      enumRes = enumerate (fmap (getSolProp nt) (runStrat envir))
       (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
                                       (getSolProp nt)
                                       (runStrat envir)) r)
@@ -118,7 +119,7 @@ go fn flags = do
          [] -> do
            x' <- getTime
            let timetaken = x' - x
-           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken 
+           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken
          (z : e) ->
            putStrLn "Failed test:" >> printFailure z
        unless output $ print (length propRes)
@@ -128,19 +129,32 @@ go fn flags = do
 
       outputEnum = do
         x <- getTime
-        let r = [z | Left z <- convBool <$> enumRes]
-        case r of
-          [] -> do
-            x' <- getTime
-            let timetaken = x' - x
-            when output (putStrLn $ "+++ Ok, successfully enumerated " ++ show (length enumRes) ++ " tests in " ++
-                         secs timetaken)
-          es ->
-            when output $ mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
-        unless output . print $ length enumRes
-        unless output . print $ enumResBT
-        unless output . print $ enumResFails
-        unless output  $ printTimeDiff x
+        if output
+        then
+          let res = [z | Just (Left z) <- fmap convBool <$> enumRes]
+            in case res of
+              [] -> do
+                x' <- getTime
+                let timetaken = x' - x
+                putStrLn $ "+++ Ok, successfully enumerated " ++ show (length . filter isJust $ enumRes)
+                             ++ " tests in " ++ secs timetaken
+              es ->
+                mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
+        else do
+          let (enumResSuc, enumResFails) = counter enumRes
+          unless output . print $ enumResSuc
+          unless output . print $ (-1 :: Int)
+          unless output . print $ enumResFails
+          unless output  $ printTimeDiff x
+
+
+--        let r = [z | Left z <- convBool <$> enumRes]
+--        case r of
+--          
+--        unless output . print $ length enumRes
+--        unless output . print $ enumResBT
+--        unless output . print $ enumResFails
+--        unless output  $ printTimeDiff x
 
       convBool ((Con cid _), z) | cid == sc = Right z
                                 | cid == fl = Left z
@@ -177,8 +191,8 @@ go fn flags = do
 
       setupNarrow = maybe narrowSetup sizedSetup sizeArg
 
-      runStrat = if basicStrat then runOverlap (basicSetup dataBound propName >>= narrow Nothing)
-                               else runOverlap (setupNarrow propName >>= narrow Nothing)
+      runStrat = if basicStrat then runOverlapT (basicSetup dataBound propName >>= narrow Nothing)
+                               else runOverlapT (setupNarrow propName >>= narrow Nothing)
  --     runSizedStrat env i = runOverlap (narrowSizedSetup i propName >>= narrow Nothing) env
 
       showfuncs = not (null [() | ShowFunctions <- flags])

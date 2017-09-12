@@ -4,7 +4,7 @@ import Prelude ()
 import OverlapPrelude
 
 {-# Dist E 1 #-}
-{-# Dist C 6 #-}
+{-# Dist C 5 #-}
 
 check :: List Nat -> List Nat -> Result
 check l l' = gen l l'  ==> set (union l l')

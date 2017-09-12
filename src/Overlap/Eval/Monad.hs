@@ -1,10 +1,20 @@
 module Overlap.Eval.Monad (
   module X,
   OverlapT,
+  runOverlapT,
+  runOverlap,
+  Overlap,
   OverlapFail(..),
   MonadChoice(..),
   nullT,
-  Tree(..)
+  List,
+  list,
+  runList,
+  TreeF(..),
+  Tree,
+  OverlapTree(..),
+  MapTree,
+  intoMapTree
   ) where
 
 import Control.Monad.State as X
@@ -12,9 +22,11 @@ import Control.Monad.Writer as X hiding (Alt)
 import Control.Monad.Except as X
 import Control.Monad.Identity as X
 import Control.Monad.Reader as X
-import Control.Monad.List
+import Control.Monad.List as X
 
-import Data.Maybe
+import Control.Monad.Free as X
+
+import Control.Arrow
 
 import Overlap.Eval.Env
 import Overlap.Eval.Expr
@@ -26,18 +38,54 @@ data OverlapFail
   | ConstraintFail deriving Show
 
 type OverlapT m = ExceptT OverlapFail (StateT (Env Expr) m)
+type Overlap = OverlapT Identity
 
-data Tree a = Leaf a | Branch [(Int, Tree a)] deriving Functor
+runOverlapT :: OverlapT m a -> Env Expr -> m (Either OverlapFail a, Env Expr)
+runOverlapT = runStateT . runExceptT
 
-instance Applicative Tree where
+runOverlap :: Overlap a -> Env Expr -> (Either OverlapFail a, Env Expr)
+runOverlap o = runIdentity . runOverlapT o
+
+type List = ListT Identity
+
+list :: [a] -> List a
+list = ListT . Identity
+
+runList :: List a -> [a]
+runList = runIdentity . runListT
+
+data TreeF f a = Leaf a | Branch [f (TreeF f a)] deriving Functor
+type Tree = TreeF ((,) Int)
+
+data OverlapTree a = OverlapTree {runOverlapTree :: (Overlap (Either [(Int, OverlapTree a)] a))}
+
+instance Functor OverlapTree where
+  fmap f = OverlapTree .  fmap ((map . fmap . fmap) f +++ f) . runOverlapTree
+
+--instance Applicative OverlapTree where
+--  pure = OverlapTree . return . Right
+--  OverlapTree f <*> OverlapTree g = 
+--
+--instance Monad OverlapTree where
+--  return = OverlapTree . return . Right
+
+type MapTree a = Tree (OverlapTree a, Env Expr -> Env Expr)
+
+intoMapTree :: OverlapTree a -> MapTree a
+intoMapTree s = Leaf (s, id)
+
+peelTree :: OverlapTree a -> Env Expr -> (Either ([(Int, OverlapTree a)]) (Either OverlapFail a), Env Expr)
+peelTree o = first (either (Right . Left) (fmap Right))  . runOverlap (runOverlapTree o)
+
+instance Functor f => Applicative (TreeF f) where
   pure = Leaf
   Leaf f <*> t = f <$> t
-  Branch fs <*> t = Branch (mapped . _2 %~ (<*> t) $ fs)
+  Branch fs <*> t = Branch ((fmap . fmap)  (<*> t) fs)
 
-instance Monad Tree where
+instance Functor f => Monad (TreeF f) where
   return = Leaf
   Leaf a >>= m = m a
-  Branch ts >>= m = Branch (mapped . _2 %~ (>>= m) $ ts)
+  Branch ts >>= m = Branch ((fmap . fmap) (>>= m) ts)
 
 nullT :: Tree a -> Bool
 nullT (Branch []) = True

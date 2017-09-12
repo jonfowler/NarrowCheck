@@ -14,8 +14,8 @@ import qualified Data.IntMap as I
 import Data.IntMap (IntMap)
 import Data.Maybe
 
-runOverlap :: Monad m => OverlapT m a -> Env Expr -> m (Either OverlapFail a , Env Expr)
-runOverlap m = runStateT (runExceptT m)
+--runOverlap :: Monad m => OverlapT m a -> Env Expr -> m (Either OverlapFail a , Env Expr)
+--runOverlap m = runStateT (runExceptT m)
 
 narrowSetup :: Monad m => String -> OverlapT m Expr
 narrowSetup fname = do
@@ -88,9 +88,10 @@ narrow cx e = do
    c <- reduce cx [] e
    case c of
      Fin a -> return a
-     Susp (x : _) e -> do
+     Susp (x : _) e' -> do
        _ <- choose x
-       narrow (Just x) e
+       narrow (Just x) e'
+     _ -> error "narrow, Susp should have argument"
 
 choose :: MonadChoice m => XId -> OverlapT m (CId, [FId])
 choose x = do
@@ -103,14 +104,46 @@ choose x = do
   when (maxd <= d) (throwError DataLimitFail)
   as <- use (freeNarrowSet . at' x . getNarrowSet)
   (cid, ts) <-  mchoice (map (\(cid, n, ts) -> (n, pure (cid, ts))) as)
-
---  ev <- get
---  topxs <- use (topFrees)
-  xs <- --trace (printXVars topxs ev) $
-        mapM (fvar (d + 1)) ts
+  xs <- mapM (fvar (d + 1)) ts
   free . at x ?= (cid, xs)
-  env <- get
   return (cid,xs)
+
+chooseNew :: XId -> Overlap [(Int, (CId, [NarrowSet]))]
+chooseNew x = do
+  d <- use (freeDepth . at' x)
+  maxd <- use maxDepth
+  c <- use freeCount
+  freeCount += 1
+  maxc <- use maxFreeCount
+  when (maxc < c) (throwError DataLimitFail)
+  when (maxd <= d) (throwError DataLimitFail)
+  as <- use (freeNarrowSet . at' x . getNarrowSet)
+  return $ map (\(cid, n, ts) -> (n, (cid, ts))) as
+
+applyFree :: XId -> (CId, [NarrowSet]) -> Overlap ()
+applyFree x (cid, ts) = do
+  d <- use (freeDepth . at' x)
+  xs <- mapM (fvar (d + 1)) ts
+  free . at x ?= (cid, xs)
+
+narrowNew :: Maybe Int -> Expr -> OverlapTree Expr
+narrowNew cx e = OverlapTree $ do
+   c <- reduce cx [] e
+   case c of
+     Fin a -> return . Right $ a
+     Susp (x : _) e' -> do
+       cs <- chooseNew x
+       return . Left $ (map . fmap) goNarr cs
+         where goNarr r = OverlapTree $ do
+                  applyFree x r
+                  runOverlapTree $ narrowNew (Just x) e'
+
+
+
+--narrowNew :: MonadChoice m => Maybe Int -> Expr -> OverlapT m Expr
+--narrowNew = undefined
+--
+
 
 fvar :: Monad m => Int -> NarrowSet -> OverlapT m FId
 fvar d t = do

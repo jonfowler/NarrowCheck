@@ -45,8 +45,8 @@ True ==> True = Success
 False ==*> x = NoTest 
 True ==*> x = x
 
-property False = Fail
-property True = Success
+post False = Fail
+post True = Success
 
 data Nat = Z | S Nat deriving Show
 

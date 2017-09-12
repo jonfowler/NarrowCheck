@@ -6,6 +6,9 @@ import OverlapPrelude
 data Tree = Leaf Char | Fork Tree Tree deriving Show
 data Char = U | V | W | X | Y deriving Show
 
+{-# DIST E 1 #-}
+{-# DIST C 5 #-}
+
 checkBasic :: List Char -> Result
 checkBasic l = not (null l) ==> eqListTrad (=|=) l (encdec l (hufftree l)) 
 
