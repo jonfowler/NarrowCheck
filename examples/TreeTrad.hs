@@ -6,26 +6,29 @@ import OverlapPrelude
 data Tree = Leaf | Node Tree Nat Tree
 
 {-# DIST Leaf 1 #-}
-{-# DIST Node 2 #-}
+{-# DIST Node 1 #-}
 
 {-
 The following properties all use overlapping conjunction in order
-to keep the sizing functions in "scope".
+to utilise the sizing functions.
 -}
-checkn :: Nat -> Nat -> Tree -> Result 
+checkn :: Nat -> Nat -> Tree -> Result
 checkn i n t = (ordered t && (depth t <= i) && (depthNat t <= s30))
                                       ==> ordered (del n t) 
 
-check :: Nat -> Tree -> Result 
-check n t = checkn s5 n t 
+check :: Nat -> Tree -> Result
+check n t = checkn s5 n t
 
 checkBasic :: Nat -> Tree -> Result
 checkBasic n t = ordered t ==> ordered (del n t)
 
+altCheckBasic :: Nat -> Tree -> Result
+altCheckBasic n t = altOrdered t ==> altOrdered (del n t)
+
 genn :: Nat -> Tree -> Bool
 genn i t = ordered t && (depth t <= i) && (depthNat t <= s30)
 
-enumCheckn :: Nat -> Tree -> Result 
+enumCheckn :: Nat -> Tree -> Result
 enumCheckn i t = (ordered t && (depth t <= i) && (depthNat t <= s3))
                                       ==> True
 
@@ -41,7 +44,7 @@ depthNat :: Tree -> Nat
 depthNat Leaf = Z
 depthNat (Node t1 a t2) = max a (max (depthNat t1) (depthNat t2))
 
-allle i Leaf = True 
+allle i Leaf = True
 allle i (Node t1 x t2) = x <= i *&&* allle i t1 *&&* allle i t2
 
 allge i Leaf = True
@@ -62,6 +65,18 @@ ordered (Node t1 a t2) =  allle a t1 *&&*
                           ordered t1 *&&*
                           allge a t2 *&&*
                           ordered t2
+
+altOrdered Leaf = True
+altOrdered (Node t1 a t2) = altOrdered t1  *&&*
+                            altAll (<= a) t1 *&&*
+                            altAll (>= a) t2 *&&*
+                            altOrdered t2
+
+altAll :: (Nat -> Bool) -> Tree -> Bool
+altAll p (Node t1 a t2) = altAll p t1 *&&* p a *&&* altAll p t2
+altAll p Leaf = True
+
+
 
 depth Leaf = Z 
 depth (Node t1 x t2) = S (maxTrad (depth t1) (depth t2))

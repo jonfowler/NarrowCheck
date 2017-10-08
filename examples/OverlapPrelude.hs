@@ -4,10 +4,6 @@ import Prelude (Show)
 
 data Bool = True | False deriving Show
 
-
-{-# DIST Z 1 #-}
-{-# DIST S 2 #-}
-
 not False = True
 not True = False
 
