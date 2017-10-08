@@ -33,6 +33,7 @@ data Flag
   | Enumerate
   | DepthBound Int
   | Basic
+  | Wide
 
 options :: [OptDescr Flag]
 options =
@@ -50,6 +51,8 @@ options =
       "Enumerate solutions",
     Option [] ["basic"] (NoArg Basic)
       "Basic Strategy",
+    Option [] ["wide"] (NoArg Wide)
+      "Wide evaluation, no evaluation sharing",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No printed output",
     Option ['p'] ["property"] (ReqArg  PropName "String")
@@ -91,10 +94,10 @@ toFileName (a : as) = a ++ "/" ++ toFileName as
 go :: FilePath -> [Flag] -> IO ()
 go fn flags = do
   rf <- readFile fn
-  m <- P.parseModule rf
+  (m, ps) <- P.parseModule rf
   let fns = map toFileName $ m ^. P.moduleImports
   ms <- mapM (readFile >=> P.parseModule) fns
-  m' <- P.mergeModules m ms
+  m' <- P.addPragmas (concatMap snd ms ++ ps) <$> P.mergeModules m (map fst ms)
   P.checkModule m'
   r <- getStdGen
   let envir = C.convModule 100000000 dataBound m'
@@ -108,30 +111,36 @@ go fn flags = do
       (genRes, (Sum genResBT, Sum genResFails))
             = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
   --    (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
-      enumRes = enumerate (fmap (getSolProp nt) (runStrat envir))
+
+      enumRes = if wideStrat
+                then wideEnumerate (fmap (getSolProp nt) . ($ envir)) runStrat
+                else enumerate (fmap (getSolProp nt) (runStrat envir))
+
       (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
                                       (getSolProp nt)
                                       (runStrat envir)) r)
       outputProp = do
        x <- getTime
-       let r = [ z | Left z <- convBool <$> propRes]
+       let allr = convBool <$> propRes
+           r = [ (z,z') | (False, z,z') <- allr]
        when output $ case r of
          [] -> do
            x' <- getTime
            let timetaken = x' - x
            putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken
-         (z : e) ->
-           putStrLn "Failed test:" >> printFailure z
+         ((z,args) : e) ->
+           putStrLn "Failed test:" >> printFailure z args
        unless output $ print (length propRes)
        unless output . print $ propResBT
        unless output . print $ propResFails
        unless output  $ printTimeDiff x
+       unless output $ printTests allr
 
       outputEnum = do
         x <- getTime
         if output
         then
-          let res = [z | Just (Left z) <- fmap convBool <$> enumRes]
+          let res = [(z,z') | Just (False, z, z') <- fmap convBool <$> enumRes]
             in case res of
               [] -> do
                 x' <- getTime
@@ -139,7 +148,7 @@ go fn flags = do
                 putStrLn $ "+++ Ok, successfully enumerated " ++ show (length . filter isJust $ enumRes)
                              ++ " tests in " ++ secs timetaken
               es ->
-                mapM_ (\e -> putStrLn "Failed test:" >> printFailure e) es
+                mapM_ (\(e,args) -> putStrLn "Failed test:" >> printFailure e args) es
         else do
           let (enumResSuc, enumResFails) = counter enumRes
           unless output . print $ enumResSuc
@@ -156,8 +165,8 @@ go fn flags = do
 --        unless output . print $ enumResFails
 --        unless output  $ printTimeDiff x
 
-      convBool ((Con cid _), z) | cid == sc = Right z
-                                | cid == fl = Left z
+      convBool (Con cid _, z, es) | cid == sc = (True, z, es)
+                                  | cid == fl = (False, z, es)
       convBool _ = error "should be true or false"
 
 
@@ -169,7 +178,7 @@ go fn flags = do
          else outputEnum
     else do
        x <- getTime
-       when output . printResults $ genRes
+--       when output . printResults $ genRes
        unless output . print . length $ genRes
        unless output . print $ genResBT
        unless output . print $ genResFails
@@ -188,28 +197,41 @@ go fn flags = do
       propName = fromMaybe "check" (listToMaybe [n | PropName n <- flags])
       sizeArg = listToMaybe [n | Sized n <- flags]
       basicStrat = not (null [() | Basic <- flags])
+      wideStrat = not (null [() | Wide <-flags ])
 
       setupNarrow = maybe narrowSetup sizedSetup sizeArg
 
-      runStrat = if basicStrat then runOverlapT (basicSetup dataBound propName >>= narrow Nothing)
-                               else runOverlapT (setupNarrow propName >>= narrow Nothing)
+      runStrat = if basicStrat then runOverlapT basicStrategy
+                               else runOverlapT narrowStrategy
  --     runSizedStrat env i = runOverlap (narrowSizedSetup i propName >>= narrow Nothing) env
+
+      basicStrategy = do
+         (e,args) <- basicSetup dataBound propName
+         res <- narrow Nothing e
+         return (res, args)
+
+      narrowStrategy = do
+         res <- setupNarrow propName >>= narrow Nothing
+         theenv <- get
+         xs <- use topFrees
+         return (res, map (getFreeExpr theenv) xs)
+
 
       showfuncs = not (null [() | ShowFunctions <- flags])
       output = null [() | NoOutput <- flags]
 --      refute = not (null [() | Refute <- flags])
 
-      getSolProp nt (Right (Con cid _), _) | cid == nt = Nothing
-      getSolProp _ (Right (Con cid' es), z) = Just $ (Con cid' es, z)
+      getSolProp nt (Right (Con cid _, _), _) | cid == nt = Nothing
+      getSolProp _ (Right (Con cid' es, args), z) = Just $ (Con cid' es, z, args)
       getSolProp _ (Left e, _) = Nothing
-      getSolProp _ (Right Bottom, _) = Nothing
+      getSolProp _ (Right (Bottom,_), _) = Nothing
       getSolProp _ (e, _) = error $ "Internal: not evaluated "
 
 --      evalRes e z = head <$> generating backtrack (return . Just) (runOverlap (narrow Nothing e) z)
 
-      getSol tr (Right (Con cid rs), z) | cid == tr = Just (Con cid rs, z)
-      getSol _ (Right (Con _ _), z) = Nothing
-      getSol _ (Right Bottom, _) = Nothing
+      getSol tr (Right (Con cid rs, es), z) | cid == tr = Just (Con cid rs, z, es)
+      getSol _ (Right (Con _ _, es), z) = Nothing
+      getSol _ (Right (Bottom, es), _) = Nothing
       getSol _ (Left DataLimitFail, z) = Nothing
       getSol _ (Left _, z) = Nothing
       getSol _ (e, _) = error $ "Internal: not evaluated " ++ show e
@@ -225,8 +247,14 @@ pullfst :: (Either a b, c) -> Either (a, c) (b, c)
 pullfst (Left a, c) = Left (a , c)
 pullfst (Right b, c) = Right (b , c)
 
-printFailure :: Env Expr -> IO ()
-printFailure env = putStrLn $ printXVars (env ^. topFrees) env
+printFailure :: Env Expr -> [Expr] -> IO ()
+printFailure env = mapM_ (putStrLn . printNeatExpr env)
+
+printTests :: [(a, Env Expr, [Expr])] -> IO ()
+printTests = mapM_  (\e -> printTest e >> putStrLn "")
+
+printTest :: (a, Env Expr, [Expr]) -> IO ()
+printTest (_,e,es) = mapM_ (putStrLn . printNeatExpr e) es
 
 
 printResults :: [(Atom, Env Expr)] -> IO ()
