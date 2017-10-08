@@ -74,10 +74,13 @@ toSuspMap = I.fromList . flip zip (repeat ())
 
 reduceLocal :: Monad m => Maybe XId ->
                         FId -> LMap -> Def -> OverlapT m (Susp' Expr (LMap, Def))
-reduceLocal cx fid vm (Result vs e) = do
+reduceLocal cx fid vm (Result vs n e) = do
   i <- use nextLVar
-  f <- bindVars vm vs 
-  return . Fin $ replaceExpr f e
+  nextLVar %= (+ n)
+--  i <- use nextLVar
+--  f <- bindVars vm vs 
+  mapM_ (uncurry bind . (_1 %~ (+i))) (I.toList (I.intersection vm vs))
+  return . Fin $ replaceExpr i e
 reduceLocal cx fid vm (Match i sxs alts solxs ol) = do
   let e = fromMaybe (error "reduceLocal variable not in map") $ I.lookup i vm  
   case I.null sxs || maybe True (flip I.member sxs) cx of
@@ -86,9 +89,10 @@ reduceLocal cx fid vm (Match i sxs alts solxs ol) = do
       case a of
         Fin (Con cid es) ->  do
           (vs, d) <- matcher fid cid alts 
-          reduceLocal cx fid (I.union (I.fromList $ zip vs es) vm) d 
+          reduceLocal cx fid (I.union (I.fromList $ zip vs es) (I.insert i (Con cid es) vm)) d 
         Fin Bottom -> throwError DataLimitFail
         Susp x e' -> reduceOverlap (I.insert i e' vm) x (toSuspMap x) 
+  -- (I.insert i e' vm)
     False -> reduceOverlap vm (I.keys sxs) sxs
 
 --      maybe
@@ -108,7 +112,7 @@ reduceLocal cx fid vm (Match i sxs alts solxs ol) = do
     reduceOverlap :: Monad m => LMap -> [XId] -> I.IntMap () -> OverlapT m (Susp' Expr (LMap, Def))
     reduceOverlap vm x sxs = maybe 
              (return $ Susp (x ++ nub' sxs (I.keys solxs)) (vm, Match i sxs alts solxs ol))
-             reduceOverlap' 
+             reduceOverlap'
              (if I.null solxs || maybe True (flip I.member solxs) cx then ol else Nothing)
       where
         reduceOverlap' d = do
@@ -168,19 +172,30 @@ bindVar vm b = do
   return (\x -> if x == b then Just v else Nothing)
   
 
-replaceExpr :: (Int -> Int) -> Expr -> Expr
-replaceExpr f (Let v e e') = Let (f v) (replaceExpr f e) (replaceExpr f e')
+replaceExpr :: Int -> Expr -> Expr
+replaceExpr f (Let v e e') = Let (f + v) (replaceExpr f e) (replaceExpr f e')
 replaceExpr f (App e e') = App (replaceExpr f e) (replaceExpr f <$> e') 
 replaceExpr f (Fun fid) = Fun fid
-replaceExpr f (Var v) = Var $ f v
+replaceExpr f (Var v) = Var $ f + v
 replaceExpr f (FVar x) = FVar x
-replaceExpr f (Lam v e) = Lam (f v) $ replaceExpr f e
+replaceExpr f (Lam v e) = Lam (f + v) $ replaceExpr f e
 replaceExpr f Bottom = Bottom
 replaceExpr f (Con cid es) = Con cid (replaceExpr f <$> es)
 replaceExpr f (Local fid i d) = Local fid i d
 
+--replaceExpr :: LMap -> Int -> Int -> Expr -> Expr
+--replaceExpr f m p (Let v e e') = Let (p + v) (replaceExpr f m p e) (replaceExpr f m p e')
+--replaceExpr f m p (App e e') = App (replaceExpr f m p e) (replaceExpr f m p <$> e') 
+--replaceExpr f m p (Fun fid) = Fun fid
+--replaceExpr f m p (Var v) = if v < m then maybe (error "blahabalkj") id (I.lookup v f) else Var (v + p)
+--replaceExpr f m p (FVar x) = FVar x
+--replaceExpr f m p (Lam v e) = Lam (v + p) $ replaceExpr f m p e
+--replaceExpr f m p Bottom = Bottom
+--replaceExpr f m p (Con cid es) = Con cid (replaceExpr f m p <$> es)
+--replaceExpr f m p (Local fid i d) = Local fid i d
 
-                            
+
+
 
 --replaceAtom :: Int -> Atom -> Atom 
 --replaceAtom v (Fun f) = Fun f

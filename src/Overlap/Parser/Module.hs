@@ -11,6 +11,7 @@ module Overlap.Parser.Module (
   moduleName,
 
   parseModule,
+  addPragmas,
   checkModule,
   mergeModules
   )where
@@ -140,14 +141,14 @@ addPragma (Dist c n) m = case m ^. moduleCon . at c of
       where changeFreq [] = []
             changeFreq ((cid, f, ts) : cs) | cid == c = (cid, n, ts) : cs
             changeFreq (c1 : cs) = c1 : changeFreq cs
-   Nothing -> m
+   Nothing -> error $ "blah " ++ show c -- m
 
-parseModule :: Monad m => String -> m Module
+parseModule :: Monad m => String -> m (Module, [Pragma])
 parseModule s = case runParse parserOfModule s of
   Failure err -> fail . show $ err
   Success (m, ps) -> case runExcept m of 
     Left err -> fail err
-    Right m -> return (addPragmas ps m)
+    Right m' -> return (m', ps)
 
 checkModule :: Monad m => Module -> m ()
 checkModule m = case runExcept (checkTypeDefs m >> checkScopes m) of

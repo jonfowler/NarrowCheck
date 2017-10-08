@@ -24,7 +24,7 @@ applyType _ (TGlob t) = Type t []
 applyType ts (TApp x y) = let (Type t xs) = applyType ts x in Type t (xs ++ [applyType ts y])
 applyType _ (TArrow _ _) = Type (-1) []
 
-data NarrowSet = Narrow {_getNarrowSet :: [(CId,Int,[NarrowSet])]} deriving (Generic)
+data NarrowSet = Narrow {_getNarrowSet :: [(CId,Int,[NarrowSet])]} deriving (Generic, Show)
 
 makeLenses ''NarrowSet
 
@@ -42,7 +42,7 @@ data Expr
 type Atom = Expr
 
 data Def = Match Int (I.IntMap ()) [Alt] (I.IntMap ()) !(Maybe Def)
-         | Result [Int] Expr deriving (Show,Generic)
+         | Result (I.IntMap ()) Int Expr deriving (Show,Generic)
 
 data Alt = Alt CId [Int] Def
          | AltDef Def deriving (Show,Generic)

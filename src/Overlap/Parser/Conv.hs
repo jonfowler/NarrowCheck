@@ -184,13 +184,15 @@ patternName (PatCon cid ps) (Node i b) = do
 patternNames :: [Pattern' CId VarId] -> [BackBone Int] -> State Convert [CPattern]
 patternNames  = zipWithM patternName
 
-convPDef :: Convert -> [BackBone Int] -> ([Pattern' CId VarId], PExpr) -> ([CPattern], Expr)
-convPDef c b (ps, e) = (ps' , e') 
+convPDef :: Convert -> [BackBone Int] -> ([Pattern' CId VarId], PExpr) -> ([CPattern], (Int, Int, Expr))
+convPDef c b (ps, e) = (ps' , (n, n', e'))
   where (ps' , c') = runState (patternNames ps b) $ c 
-        e' = case runExcept . runStateT (convExpr . desugar $ e) $ c' of
+        n = c' ^. convertLocals . nextInt
+        (e', c'') = case runExcept . runStateT (convExpr . desugar $ e) $ c' of
                Left err -> error (err ++ " \n" ++ show ps ++ "\n" ++ show ps' ++ "\n" ++ show e ++
                                  "\n")
-               Right (ne,_) -> ne
+               Right ne -> ne
+        n' = (c'' ^. convertLocals . nextInt) - n
 
 
 leadVars :: [BackBone Int] -> [LId]
@@ -226,21 +228,21 @@ empryPs _ = False
 
 type CPattern = Pattern' (CId, [Int]) LId
 
-groupDefs :: [([CPattern], Expr)] -> ([(CId, [Int], [([CPattern], Expr)])],
-                                      Maybe (LId, [([CPattern],Expr)]))
+groupDefs :: [([CPattern], a)] -> ([(CId, [Int], [([CPattern], a)])],
+                                      Maybe (LId, [([CPattern], a)]))
 groupDefs [] = ([],Nothing)
 groupDefs xs@(((PatCon (cid, is) _ : _), e) : _) = first ((cid, is, map getPEs ys):) $ groupDefs ys'
     where (ys, ys') = span (\(x:_,_) -> not (isPatVar x) && cid == fst (getPatCon x)) xs 
           getPEs (PatCon _ cps : cps', e)  = (cps ++ cps', e)
-groupDefs ((PatVar vid : cps, e) : xs) = second 
+groupDefs ((PatVar vid : cps, e) : xs) = second
                              (maybe (Just (vid,[(cps, e)])) $ \(vid,es) -> Just (vid, (cps,e):es))
                              $ groupDefs xs
 
-convOverlapDef :: [Int] -> [([CPattern], Expr)] -> Def
+convOverlapDef :: [Int] -> [([CPattern], (Int,Int, Expr))] -> Def
 convOverlapDef is ps = convOverlapDef' is $ sortBy (compare `on` fst) ps
 
-convOverlapDef' :: [Int] -> [([CPattern], Expr)] -> Def
-convOverlapDef' _ (([], e) : _) = Result (usedVars e) e
+convOverlapDef' :: [Int] -> [([CPattern], (Int,Int, Expr))] -> Def
+convOverlapDef' _ (([], (n,n',e)) : _) = Result (I.filterWithKey (\k _ -> (k < n)) $ usedVars' e) (n + n') e
 convOverlapDef' (_ : is) ps | all (isPatVar . head . fst) ps = convOverlapDef is (map (first tail) ps)
 convOverlapDef' (i : is) ps = case groupDefs ps of
   (alts, ol) -> Match i (I.empty) (toAlt <$> alts) (I.empty) (convOverlapDef is . snd <$> ol)
@@ -252,17 +254,17 @@ isPatVar :: Pattern' a b -> Bool
 isPatVar (PatVar _) = True
 isPatVar _ = False
 
-convOrderedDef :: [Int] -> [([CPattern], Expr)] -> Def
+convOrderedDef :: [Int] -> [([CPattern], (Int,Int,Expr))] -> Def
 convOrderedDef is ps = fromJust $ convOrderedDef' is ps Nothing
 
-convOrderedDef' :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Maybe Def
+convOrderedDef' :: [Int] -> [([CPattern], (Int,Int,Expr))] -> Maybe Def -> Maybe Def
 convOrderedDef' _ [] d = d
-convOrderedDef' _ (([], e) : _) _ = Just $ Result (usedVars e) e
+convOrderedDef' _ (([], (n,n',e)) : _) _ = Just $ Result (I.filterWithKey (\k _ -> (k < n)) $ usedVars' e) (n + n') e
 convOrderedDef' is ps d | (isVar . head) ps = let
                                  (vs, ps') = span isVar ps
                                  d' = convOrderedDef' is ps' d
                                in convOrderedDef' (tail is) (first tail <$> vs) d'
-   where isVar = isPatVar . head . fst  
+   where isVar = isPatVar . head . fst
 convOrderedDef' is ps d | (isCon . head) ps = let
                                  (cs, ps') = span isCon ps
                                  d' = convOrderedDef' is ps' d
@@ -271,14 +273,14 @@ convOrderedDef' is ps d | (isCon . head) ps = let
    where isCon = not . isPatVar . head . fst 
          getCon = fst . getPatCon . head . fst
 
-matchCon  :: [Int] -> [([CPattern], Expr)] -> Maybe Def -> Maybe Def
+matchCon  :: [Int] -> [([CPattern], (Int,Int,Expr))] -> Maybe Def -> Maybe Def
 matchCon (i : is) ps d = Just $ Match i (I.empty) alts (I.empty) Nothing
    where alts = map (matchAlt is d) (groupBy ((==) `on` getCon) ps) ++ defAlt
          defAlt = maybe [] ((:[]) . AltDef) d
          getCon = fst . getPatCon . head . fst
 matchCon is ps d = error $ show is ++ "\n" ++ show ps 
 
-matchAlt :: [Int] ->  Maybe Def -> [([CPattern], Expr)] -> Alt 
+matchAlt :: [Int] ->  Maybe Def -> [([CPattern], (Int,Int,Expr))] -> Alt
 matchAlt is d ps = Alt c vs d' 
   where  (c, vs) = getPatCon . head . fst . head $ ps
          Just d' = convOrderedDef' (vs ++ is) [((qs' ++ qs), e) | (PatCon c qs' : qs, e) <- ps] d
@@ -321,8 +323,8 @@ atomise e | atom e = return (id, e)
 atomises :: [Expr] -> ConvertM (Expr -> Expr, [Atom])
 atomises es = foldr (\(f , a) (g , as) -> (f . g, a : as)) (id , []) <$> mapM atomise es
 
-usedVars :: Expr -> [Int]
-usedVars = I.keys . usedVars'
+--usedVars :: Expr -> [Int]
+--usedVars = I.keys . usedVars'
 
 usedVars' :: Expr -> I.IntMap ()              
 usedVars' (App e es) = I.union (usedVars' e) $ foldr (\e vs -> I.union (usedVars' e) vs) I.empty es
@@ -342,7 +344,12 @@ convExpr (PCon cid es) = do
   c <- viewConv convertCon cid
   return . f $ (Con c as) 
 convExpr (PApp e1 e2) = let (f : es) = joinApps e1 [e2]
-                        in App <$> convExpr f <*> mapM convExpr es
+                        in do
+     f' <- convExpr f
+     es' <- mapM convExpr es
+--     (g, as) <- atomises es'
+     return $ App f' es'
+--     return . g $ App f' as
   where joinApps (PApp e e') es = joinApps e (e' : es)
         joinApps e es = e : es
 convExpr (PLam v e) = do

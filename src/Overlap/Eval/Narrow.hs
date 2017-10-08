@@ -14,6 +14,8 @@ import qualified Data.IntMap as I
 import Data.IntMap (IntMap)
 import Data.Maybe
 
+import Debug.Trace
+
 --runOverlap :: Monad m => OverlapT m a -> Env Expr -> m (Either OverlapFail a , Env Expr)
 --runOverlap m = runStateT (runExceptT m)
 
@@ -29,19 +31,22 @@ narrowSet :: IntMap [(CId, Int, [TypeExpr])] -> Type -> NarrowSet
 narrowSet e (Type tid ts) = Narrow . map narrowCid $ e ^. at' tid
   where narrowCid (cid,n,tes) = (cid,n, map (narrowSet e . applyType ts) tes)
 
-basicSetup :: MonadChoice m => Int -> String -> OverlapT m Expr
+basicSetup :: MonadChoice m => Int -> String -> OverlapT m (Expr, [Expr])
 basicSetup n fname = do
   (fid, ts) <- getFunc fname
   es <- mapM (generateType n) ts
-  return $ App (Fun fid) es
+  return (App (Fun fid) es, es)
 
 generateType :: MonadChoice m => Int -> Type -> OverlapT m Expr
-generateType 0 _ = return Bottom
 generateType n (Type tid ts) = do
-  cs <- use (typeConstr . at' tid)
-  (cid, tes)   <- mchoice (map (\(cid, fq, tes) -> (fq, pure (cid, tes))) cs)
-  es <- mapM (generateType (n-1) . applyType ts) tes
-  return (Con cid es)
+  cs <- gofilter n <$> use (typeConstr . at' tid)
+  if null cs then return Bottom
+  else do
+   (cid, tes)   <- mchoice (map (\(cid, fq, tes) -> (fq, pure (cid, tes))) cs)
+   es <- mapM (generateType (n-1) . applyType ts) tes
+   return (Con cid es)
+     where gofilter n' | n' <= 0 = filter (\(_,_,tes) -> null tes)
+           gofilter _ = id
 
 --generateType n (Type tid ts) = do
 --   cs <- use (typeConstr . at' tid)
@@ -100,13 +105,15 @@ choose x = do
   c <- use freeCount
   freeCount += 1
   maxc <- use maxFreeCount
-  when (maxc < c) (throwError DataLimitFail)
-  when (maxd <= d) (throwError DataLimitFail)
-  as <- use (freeNarrowSet . at' x . getNarrowSet)
+  let t = maxd <= d || maxc < c
+  as <- gofilter t <$> use (freeNarrowSet . at' x . getNarrowSet)
+  when (null as) (throwError DataLimitFail)
   (cid, ts) <-  mchoice (map (\(cid, n, ts) -> (n, pure (cid, ts))) as)
   xs <- mapM (fvar (d + 1)) ts
   free . at x ?= (cid, xs)
   return (cid,xs)
+    where gofilter True = filter (\(_,_,l) -> null l)
+          gofilter False = id
 
 chooseNew :: XId -> Overlap [(Int, (CId, [NarrowSet]))]
 chooseNew x = do

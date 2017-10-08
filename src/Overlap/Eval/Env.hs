@@ -83,7 +83,14 @@ printXVars1 :: [Int] -> Env Expr -> String
 printXVars1 xs env = concatMap (\x -> show x ++ " -> " ++ printXVar1 env x ++ "\n") xs 
 
 printXVars :: [Int] -> Env Expr -> String
-printXVars xs env = concatMap (\x -> " " ++ printXVar env x) xs 
+printXVars xs env = concatMap (\x -> " " ++ printXVar env x) xs
 
+getFreeExpr :: Env Expr -> XId -> Expr
+getFreeExpr env x = case env ^. free . at x of
+  Just (cid, xs) -> Con cid (map (getFreeExpr env) xs)
+  Nothing -> Bottom
 
-
+printNeatExpr :: Env Expr -> Expr -> String
+printNeatExpr env (Con cid es) = env ^. constrNames . at' cid ++ bracket (map (printNeatExpr env) es)
+printNeatExpr _ Bottom = "_"
+printNeatExpr _ _ = error "should only print constructors or bottom"
