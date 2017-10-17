@@ -108,17 +108,21 @@ go fn flags = do
       sc = envir ^. constrIds . at' "Success"
       fl = envir ^. constrIds .at' "Fail"
 --      rs = pullfst <$> runStrat env
-      (genRes, (Sum genResBT, Sum genResFails))
-            = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
+  --    (genRes, (Sum genResBT, Sum genResFails))
+   --         = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
   --    (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
-
+      (genResFails , genRes) = taker genNum
+              $ evalState (generatingR backtrack (fmap (getSol tr) . ($ envir)) runStrat) r
+      genResBT = -1
       enumRes = if wideStrat
                 then wideEnumerate (fmap (getSolProp nt) . ($ envir)) runStrat
                 else enumerate (fmap (getSolProp nt) (runStrat envir))
-
-      (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
-                                      (getSolProp nt)
-                                      (runStrat envir)) r)
+      (propResFails , propRes) = taker genNum
+              $ evalState (generatingR backtrack (fmap (getSolProp nt) . ($ envir)) runStrat) r
+      propResBT = -1
+--      (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
+--                                      (getSolProp nt)
+--                                      (runStrat envir)) r)
       outputProp = do
        x <- getTime
        let allr = convBool <$> propRes
