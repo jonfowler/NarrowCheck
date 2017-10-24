@@ -5,6 +5,7 @@ import Overlap.Eval.Monad
 import System.Random hiding (newStdGen)
 import Overlap.Lens
 import Data.Maybe
+import Control.DeepSeq
 
 newStdGen :: State StdGen StdGen
 newStdGen = do
@@ -12,13 +13,22 @@ newStdGen = do
   put n
   return n'
 
-taker :: Int -> [Maybe a] -> (Int, [a])
-taker 0 _ = (0,[])
-taker _ [] = (0,[])
-taker n (Nothing : l) = let ~(i , l') = taker n l
-                        in (i + 1, l')
-taker n (Just a : l) = let ~(i , l') = taker (n -1) l
-                       in (i, a : l')
+taker :: NFData b => (a -> b) -> Int -> [Maybe a] -> (Int, Int, [b])
+taker f n l = go n l 0 0
+  where go _ [] i j = (i,j,[])
+        go 0 _ i j = (i,j,[])
+        go n' (Nothing : l') i j = let j' = j + 1
+                                  in seq j' (go n' l' i j')
+        go n' (Just a : l') i j = let i' = i + 1
+                                      b = f a
+                                 in deepseq (i', b) (_3 %~ (b:) $ go (n'-1) l' i' j)
+
+
+--taker f _ [] = (0,0)
+--taker f n (Nothing : l) = let ~(i ,j) = taker n l
+--                        in (i + 1,j)
+--taker n (Just _ : l) = let ~(i ,j) = taker (n -1) l
+--                       in (i,j+1)
 
 generating :: Int -> Int -> (a -> Maybe b) -> Tree a -> StateT StdGen (Writer (Sum Int, Sum Int)) [b]
 generating n bt p = generating' n bt . Just . fmap p
@@ -91,16 +101,16 @@ randomS bds = do
 
 data RTree = REnd | RBranch [(Int,Int,RTree)]
 
-type ZipR a = [([(Int,Tree a)] ,[(Int,Int,RTree)], (Int, Int), [(Int,Int,RTree)])]
+type ZipR a = [([(Int,Int,RTree)], (Int, Int), [(Int,Int,RTree)])]
 
 remakeR :: ZipR a -> Maybe RTree
 remakeR [] = Nothing
-remakeR ((_,[],_,[]) : ts) = remakeR ts
-remakeR ((_,bs,_,bs') : ts) = Just $ remakeR' (RBranch (bs ++ bs')) ts
+remakeR (([],_,[]) : ts) = remakeR ts
+remakeR ((bs,_,bs') : ts) = Just $ remakeR' (RBranch (bs ++ bs')) ts
 
 remakeR' :: RTree -> ZipR a -> RTree
 remakeR' t [] = t
-remakeR' t ((_,bs,(i,fq),bs') : ts) = remakeR' (RBranch (bs ++ (i,fq,t) : bs')) ts
+remakeR' t ((bs,(i,fq),bs') : ts) = remakeR' (RBranch (bs ++ (i,fq,t) : bs')) ts
 
 
 generatingR :: Int -> (e -> Tree (Maybe b)) -> e -> State StdGen [Maybe b]
@@ -108,7 +118,7 @@ generatingR bt f' e' = goGenR bt f' e' REnd
 
 {-# NOINLINE goGenR #-}
 goGenR bt f e rt = do
-          (a, zt) <- genR bt (f e) bt [] rt
+          (a, zt) <- genR bt (f e) bt [] [] rt
           case remakeR zt of
             Nothing -> return [a]
             Just rt' -> (a:) <$> goGenR bt f e rt'
@@ -130,18 +140,18 @@ rbranch bs = foldr go (const []) bs 0
 --genR _ t 0 backtracks _ | noutTree t = return (Nothing, backtracks)
 --genR bt t i ((bs,b1,_ ,b2) : backtracks) _ | noutTree t = genR bt (Branch bs) (i-1) backtracks (RBranch (b1++b2))
 
-genR :: Int -> Tree (Maybe b) -> Int -> ZipR (Maybe b)-> RTree -> State StdGen (Maybe b, ZipR (Maybe b))
-genR bt t p btks zt | noutTree t || noutRTree zt = case btks of
+genR :: Int -> Tree (Maybe b) -> Int -> [[(Int,Tree (Maybe b))]] -> ZipR (Maybe b)-> RTree -> State StdGen (Maybe b, ZipR (Maybe b))
+genR bt t p bbs btks zt | noutTree t || noutRTree zt = case btks of
   _ | null btks || p == 0 -> return (Nothing, btks)
-  ((bs,b1,_ ,b2) : btks') -> genR bt (Branch bs) (p-1) btks' (RBranch (b1 ++ b2))
-genR _ (Leaf (Just a)) _ btks _ = return (Just a, btks)
-genR bt (Branch bs) p btks rt = case rt of
+  ((b1,_ ,b2) : btks') -> genR bt (Branch (head bbs)) (p-1) (tail bbs) btks' (RBranch (b1 ++ b2))
+genR _ (Leaf (Just a)) _ _ btks _ = return (Just a, btks)
+genR bt (Branch bs) p bbs btks rt = case rt of
     REnd -> go (rbranch bs)
     RBranch rbs -> go rbs
   where go rbs = do
          (rb1,(i,fq,rt') : rb2) <- splitRandR rbs
          let t = snd (bs !! i)
-         genR bt t (min (p + 1) bt) ((bs, rb1, (i,fq), rb2) : btks) rt'
-genR _ _ _ _ _ = error "genR incomplete"
+         genR bt t (min (p + 1) bt) (bs : bbs) ((rb1, (i,fq), rb2) : btks) rt'
+genR _ _ _ _ _ _ = error "genR incomplete"
 
 

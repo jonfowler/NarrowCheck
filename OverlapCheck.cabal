@@ -29,6 +29,7 @@ executable overlapcheck
                        trifecta == 1.6.*,
                        time == 1.6.*,
                        free,
+                       text,
                        deepseq 
   hs-source-dirs:      src
   default-language:    Haskell2010

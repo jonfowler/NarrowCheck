@@ -16,6 +16,9 @@ import Data.Time.Clock.POSIX
 import Data.Fixed
 import Control.DeepSeq
 import Text.Printf
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+--import qualified
 
 import Data.Maybe
 
@@ -111,21 +114,21 @@ go fn flags = do
   --    (genRes, (Sum genResBT, Sum genResFails))
    --         = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
   --    (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
-      (genResFails , genRes) = taker genNum
-              $ evalState (generatingR backtrack (fmap (getSol tr) . ($ envir)) runStrat) r
+ --     (genResFails, genResNum , _) = taker genNum $
+      genList = evalState (generatingR backtrack (fmap (getSol tr) . ($ envir)) runStrat) r
       genResBT = -1
       enumRes = if wideStrat
                 then wideEnumerate (fmap (getSolProp nt) . ($ envir)) runStrat
                 else enumerate (fmap (getSolProp nt) (runStrat envir))
-      (propResFails , propRes) = taker genNum
-              $ evalState (generatingR backtrack (fmap (getSolProp nt) . ($ envir)) runStrat) r
+  --    (propResFails , propResNum, propRes) = taker genNum $
+      propList =  evalState (generatingR backtrack (fmap (getSolProp nt) . ($ envir)) runStrat) r
       propResBT = -1
 --      (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
 --                                      (getSolProp nt)
 --                                      (runStrat envir)) r)
       outputProp = do
        x <- getTime
-       let allr = convBool <$> propRes
+       let allr = convBool <$> take genNum [ a | Just a <- propList ]
            r = [ (z,z') | (False, z,z') <- allr]
        when output $ case r of
          [] -> do
@@ -134,11 +137,12 @@ go fn flags = do
            putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken
          ((z,args) : e) ->
            putStrLn "Failed test:" >> printFailure z args
-       unless output $ print (length propRes)
-       unless output . print $ propResBT
+       let (propResNum, propResFails, ps) = taker printy genNum propList
+       unless output . print $ propResNum
        unless output . print $ propResFails
+       unless output . print $ propResBT
        unless output  $ printTimeDiff x
-       unless output $ printTests allr
+       unless output . mapM_  (\ c -> mapM_ T.putStrLn c >> putStrLn "") $  ps
 
       outputEnum = do
         x <- getTime
@@ -163,11 +167,11 @@ go fn flags = do
 
 --        let r = [z | Left z <- convBool <$> enumRes]
 --        case r of
---          
 --        unless output . print $ length enumRes
 --        unless output . print $ enumResBT
 --        unless output . print $ enumResFails
 --        unless output  $ printTimeDiff x
+      printy (_,fenv,fes) = map (T.pack . printNeatExpr fenv) fes
 
       convBool (Con cid _, z, es) | cid == sc = (True, z, es)
                                   | cid == fl = (False, z, es)
@@ -183,9 +187,9 @@ go fn flags = do
     else do
        x <- getTime
 --       when output . printResults $ genRes
-       unless output . print . length $ genRes
-       unless output . print $ genResBT
-       unless output . print $ genResFails
+--       unless output . print $ genResNum
+--       unless output . print $ genResBT
+--       unless output . print $ genResFails
        unless output  $ printTimeDiff x
 --  when (output && not refute) (printResults (rights rs))
 --  printAll rs
