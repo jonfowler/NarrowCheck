@@ -58,7 +58,7 @@ options =
       "Wide evaluation, no evaluation sharing",
     Option [] ["NO","nooutput"] (NoArg NoOutput)
       "No printed output",
-    Option ['p'] ["property"] (ReqArg  PropName "String")
+    Option ['p'] ["property"] (ReqArg PropName "String")
        "Name of property to be tested",
     Option [] ["functions"] (NoArg ShowFunctions)
       "Output compiled functions"
@@ -80,6 +80,16 @@ options =
           | otherwise = error "Backtrack number must be postiive"
           where n = read s
 
+
+taker :: NFData b => (a -> b) -> Int -> [Maybe a] -> (Int, Int, [b])
+taker f n l = go n l 0 0
+  where go _ [] i j = (i,j,[])
+        go 0 _ i j = (i,j,[])
+        go n' (Nothing : l') i j = let j' = j + 1
+                                  in seq j' (go n' l' i j')
+        go n' (Just a : l') i j = let i' = i + 1
+                                      b = f a
+                                 in deepseq (i', b) (_3 %~ (b:) $ go (n'-1) l' i' j)
 
 main :: IO ()
 main = do
@@ -113,28 +123,33 @@ go fn flags = do
 --      rs = pullfst <$> runStrat env
   --    (genRes, (Sum genResBT, Sum genResFails))
    --         = runWriter (evalStateT (generating genNum backtrack (getSol tr) (runStrat envir)) r)
-  --    (enumRes, enumResBT, enumResFails) = enumerate (getSolProp nt) (runStrat envir)
+  --    (enumRes, enumResBT, enumResFails) = enumerate (getSolAct) (runStrat envir)
  --     (genResFails, genResNum , _) = taker genNum $
-      genList = evalState (generatingR backtrack (fmap (getSol tr) . ($ envir)) runStrat) r
+      getSolAct | prop = getSolProp nt
+                | otherwise = getSol tr
+
+      genList = evalState (randomSearch backtrack (fmap (getSol tr) . ($ envir)) runStrat) r
       genResBT = -1
       enumRes = if wideStrat
-                then wideEnumerate (fmap (getSolProp nt) . ($ envir)) runStrat
-                else enumerate (fmap (getSolProp nt) (runStrat envir))
+                then wideEnumerate (fmap (getSolAct) . ($ envir)) runStrat
+                else enumerate (fmap (getSolAct) (runStrat envir))
   --    (propResFails , propResNum, propRes) = taker genNum $
-      propList =  evalState (generatingR backtrack (fmap (getSolProp nt) . ($ envir)) runStrat) r
-      propResBT = -1
+      propList =  evalState (randomSearch backtrack (fmap (getSolAct) . ($ envir)) runStrat) r
 --      (propRes, (Sum propResBT, Sum propResFails)) = runWriter (evalStateT (generating genNum backtrack
---                                      (getSolProp nt)
+--                                      (getSolAct)
 --                                      (runStrat envir)) r)
       outputProp = do
        x <- getTime
        let allr = convBool <$> take genNum [ a | Just a <- propList ]
            r = [ (z,z') | (False, z,z') <- allr]
+           propResBT = if null r then 0 else 1
        when output $ case r of
          [] -> do
            x' <- getTime
            let timetaken = x' - x
-           putStrLn $ "+++ Ok, successfully passed " ++ show genNum ++ " tests in " ++ secs timetaken
+           let mes1 | not prop = "generated "
+                    | otherwise = "successfully passed "
+           putStrLn $ "+++ Ok, " ++ mes1 ++ show genNum ++ " tests in " ++ secs timetaken
          ((z,args) : e) ->
            putStrLn "Failed test:" >> printFailure z args
        let (propResNum, propResFails, ps) = taker printy genNum propList
@@ -142,7 +157,7 @@ go fn flags = do
        unless output . print $ propResFails
        unless output . print $ propResBT
        unless output  $ printTimeDiff x
-       unless output . mapM_  (\ c -> mapM_ T.putStrLn c >> putStrLn "") $  ps
+       when (not output || not prop) . mapM_  (\ c -> mapM_ T.putStrLn c >> putStrLn "") $  ps
 
       outputEnum = do
         x <- getTime
@@ -175,23 +190,16 @@ go fn flags = do
 
       convBool (Con cid _, z, es) | cid == sc = (True, z, es)
                                   | cid == fl = (False, z, es)
+                                  | cid == fal = (False, z, es)
+                                  | cid == tr = (True, z, es)
       convBool _ = error "should be true or false"
 
 
   when showfuncs $ putStrLn (printDoc (printDefs envir))
   () <- return (rnf envir)
-  if prop
-    then if not enum
-         then outputProp
-         else outputEnum
-    else do
-       x <- getTime
---       when output . printResults $ genRes
---       unless output . print $ genResNum
---       unless output . print $ genResBT
---       unless output . print $ genResFails
-       unless output  $ printTimeDiff x
---  when (output && not refute) (printResults (rights rs))
+  if not enum
+  then outputProp
+  else outputEnum
 --  printAll rs
 --  when (output && refute) (printResults . filter (\(Con cid _, _) -> cid == fal) . rights $ rs)
 --  print (length . rights $ rs)
@@ -211,7 +219,6 @@ go fn flags = do
 
       runStrat = if basicStrat then runOverlapT basicStrategy
                                else runOverlapT narrowStrategy
- --     runSizedStrat env i = runOverlap (narrowSizedSetup i propName >>= narrow Nothing) env
 
       basicStrategy = do
          (e,args) <- basicSetup dataBound propName

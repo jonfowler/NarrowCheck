@@ -7,18 +7,28 @@ import OverlapPrelude
 -- (With invariants coded, and a fault injected.)
 
 
-check :: Nat -> Nat -> Tree -> Result 
+check :: Nat -> Nat -> Tree -> Result
 check k a t = redBlackN k t && (k <= s3) ==> True -- redBlack (insert a t)
 
-checkn :: Nat -> Nat -> Nat -> Tree -> Result 
-checkn n k a t = redBlackN k t && (k <= n) ==> True -- redBlack (insert a t)
+checkn :: Nat -> Nat -> Nat -> Tree -> Result
+checkn n k a t = sized (redBlackN k t ==> redBlack (insert a t))
+                       (maxDepth t <= n)
+
+enumcheckn :: Nat -> Nat -> Tree -> Nat -> Result
+enumcheckn n k t a
+  = sized (redBlackN k t  ==> redBlack (insert a t))
+          ((countReds t + (s2 ^ k)) <= n && allLE s2 t && (a <= n))
 
 benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
 
 redBlackn :: Nat -> Tree -> Result
-redBlackn k t = blackRoot t && blackN k t && red t ==> True
+redBlackn k t = blackRoot t && blackN t k && red t ==> True
 
+countReds :: Tree -> Nat
+countReds (N R t1 a t2) = s1 + countReds t1 + countReds t2
+countReds (N B t1 a t2) = countReds t1 + countReds t2
+countReds L = Z
 
 data Colour = R | B
 
@@ -84,13 +94,13 @@ black' (N c t1 x t2) = black'' c (black' t1) (black' t2)
 black'' R (T b1 m) (T b2 n) = T (b1 && b2 && (m == n)) (max m n)
 black'' B (T b1 m) (T b2 n) = T (b1 && b2 && (m == n)) (S (max m n))
 
-ifB R m n = n 
-ifB B m n = m 
+ifB R m n = n
+ifB B m n = m
 
-blackN :: Nat -> Tree -> Bool
-blackN Z L = True
-blackN n (N R t1 x t2) = blackN n t1 && blackN n t2
-blackN (S n) (N B t1 x t2) = blackN n t1 && blackN n t2
+blackN :: Tree -> Nat -> Bool
+blackN L Z = True
+blackN (N R t1 x t2) n = blackN t1 n && blackN t2 n
+blackN (N B t1 x t2) (S n) = blackN t1 n && blackN t2 n
 blackN n t = False
 
 
@@ -118,7 +128,7 @@ depthNat :: Tree -> Nat
 depthNat L = Z
 depthNat (N c t0 a t1) = max a (max (depthNat t0) (depthNat t1))
 
-redBlackN k t =  blackRoot t && blackN k t && red t && ord t
+redBlackN k t =  blackRoot t && blackN t k && red t && ord t
 
 redBlack t =  red t && black t && ord t
 
@@ -129,8 +139,7 @@ prop_insertRB x t = redBlack t -- ==> redBlack (insert x t)
 ex1 :: Tree
 ex1 = N B (N B L Z L) Z (N B L Z L)
 
-nodeDepth :: Tree -> Nat -> Bool
-nodeDepth L x = True
-nodeDepth (N c t1 x t2) (S n) = nodeDepth t1 n  && nodeDepth t2 n
-nodeDepth x a = False
+maxDepth :: Tree -> Nat
+maxDepth L = Z
+maxDepth (N c t1 x t2) = S (max (maxDepth t1)  (maxDepth t2))
 

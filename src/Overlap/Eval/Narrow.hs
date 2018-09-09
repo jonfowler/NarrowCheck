@@ -27,6 +27,20 @@ narrowSetup fname = do
           topFrees .= xs
           return $ App (Fun fid) (FVar <$> xs)
 
+sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
+sizedSetup n fname = do
+        (fid, Type t _ : ts) <- getFunc fname
+        tid <- use (typeIds . at' "Nat")
+        if tid /= t
+          then error ("The first argument of " ++ fname ++ " should have type Nat"
+                   ++ " when using the sized setting")
+          else do
+            ev <- get
+            e <- use typeConstr
+            xs <- mapM (fvar 0 . narrowSet e) ts
+            topFrees .= xs
+            return $ App (Fun fid) (intToNat ev n : map FVar xs)
+
 narrowSet :: IntMap [(CId, Int, [TypeExpr])] -> Type -> NarrowSet
 narrowSet e (Type tid ts) = Narrow . map narrowCid $ e ^. at' tid
   where narrowCid (cid,n,tes) = (cid,n, map (narrowSet e . applyType ts) tes)
@@ -67,20 +81,6 @@ getFunc fname = do
                              ++ " function does not have a type"
         Just ts -> return (fid,ts)
 
-
-sizedSetup :: Monad m => Int -> String -> OverlapT m Expr
-sizedSetup n fname = do
-        (fid, Type t _ : ts) <- getFunc fname
-        tid <- use (typeIds . at' "Nat")
-        if tid /= t
-          then error ("The first argument of " ++ fname ++ " should have type Nat"
-                   ++ " when using the sized setting")
-          else do
-            ev <- get
-            e <- use typeConstr
-            xs <- mapM (fvar 0 . narrowSet e) ts
-            topFrees .= xs
-            return $ App (Fun fid) (intToNat ev n : map FVar xs)
 
 intToNat :: Env Expr -> Int -> Expr
 intToNat ev 0 = Con zer []

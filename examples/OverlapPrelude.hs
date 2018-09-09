@@ -38,6 +38,14 @@ False ==> x = NoTest
 True ==> False = Fail
 True ==> True = Success
 
+{-# OVERLAP sized #-}
+sized :: Result -> Bool -> Result
+sized NoTest x = NoTest
+sized Fail x = if' x Fail NoTest
+sized Success x = if' x Success NoTest
+sized x False = NoTest
+sized x True = x
+
 False ==*> x = NoTest 
 True ==*> x = x
 
@@ -49,6 +57,12 @@ data Nat = Z | S Nat deriving Show
 normaliseNat :: Nat -> Bool
 normaliseNat Z = True
 normaliseNat (S n) = normaliseNat n
+
+a ^ Z = s1
+a ^ (S x) = a + (a * pred (a ^ x))
+
+Z * x = Z
+(S x) * y = y + (x * y)
 
 Z <= y = True
 S x <= Z = False
@@ -71,9 +85,13 @@ x /= y = not (x == y)
 
 {-# OVERLAP (+) #-}
 Z + y = y
-x + Z = x
 S x + y = S (x + y)
+x + Z = x
 x + S y = S (x + y)
+
+x - Z = x
+Z - x = Z
+S x - S y = x - y
 
 pred Z = Z
 pred (S x) = x
@@ -128,13 +146,26 @@ data Maybe a = Nothing | Just a deriving Show
 
 a +: l = C a l
 
+comp :: (b -> c) -> (a -> b) -> a -> c
+comp f g x = f (g x)
+
 length :: List a -> Nat
 length E = Z
 length (C a l) = S (length l)
 
+head :: List a -> a
+head (C a l) = a
+
+tail :: List a -> List a
+tail (C a l) = l
+
 null :: List a -> Bool
 null E = True
 null l = False
+
+map :: (a -> b) -> List a -> List b
+map f E = E
+map f (C a l) = C (f a) (map f l)
 
 foldr :: (a -> b -> b) -> b -> List a -> b
 foldr f b E = b
@@ -165,6 +196,12 @@ eqListTrad p E E = True
 eqListTrad p (C a l) (C a' l') = p a a' *&&* eqListTrad p l l'
 eqListTrad p a b = False
 
+reverse :: List a -> List a
+reverse l = reverse' l E
+
+reverse' :: List a -> List a -> List a
+reverse' E l = l
+reverse' (C a l) l' = reverse' l (C a l')
 
 E ++ l = l
 (C a l) ++ l' = C a (l ++ l')

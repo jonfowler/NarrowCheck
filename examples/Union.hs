@@ -6,17 +6,27 @@ import OverlapPrelude
 {-# Dist E 1 #-}
 {-# Dist C 5 #-}
 
-check :: List Nat -> List Nat -> Result
-check l l' = gen l l'  ==> set (union l l')
-
 checkBasic :: List Nat -> List Nat -> Result 
 checkBasic l l' = gen l l'  ==> set (union l l')
+
+checkn :: Nat -> List Nat -> List Nat -> Result
+checkn n l l' = sized
+  (setOverlap l && setOverlap l' ==> setOverlap (union l l'))
+  ((length l <= n) && (length l' <= n) && all (<= n) l && all (<= n) l')
 
 gen :: List Nat -> List Nat -> Bool
 gen l l' = set l *&&* set l'
 
-genBasic :: List Nat -> List Nat -> Bool
-genBasic l l' = normaliseList l *&&* normaliseList l' *&&* gen l l'
+genOverlap :: List Nat -> List Nat -> Bool
+genOverlap l l' = setOverlap l && setOverlap l'
+
+setOverlap :: List Nat -> Bool
+setOverlap E = True
+setOverlap (C a l) = setOverlap' a l
+
+setOverlap' :: Nat -> List Nat -> Bool
+setOverlap' a E = True
+setOverlap' a (C a' l) = (a < a') && set' a' l
 
 set :: List Nat -> Bool
 set E = True
@@ -24,14 +34,10 @@ set (C a l) = set' a l
 
 set' :: Nat -> List Nat -> Bool
 set' a E = True
-set' a (C a' l) = (a < a') && set' a' l
+set' a (C a' l) = (a < a') *&&* set' a' l
 
 union :: List Nat -> List Nat -> List Nat
 union E l = l
 union l E = l
 union (C a l) (C a' l') = if' (a < a') (C a  (union l (C a' l')))
                                        (C a' (union (C a l) l'))
-normaliseList :: List Nat -> Bool
-normaliseList E = True
-normaliseList (C a l) = normaliseNat a *&&* normaliseList l
-

@@ -9,23 +9,30 @@ data Tree = Leaf | Node Tree Nat Tree
 {-# DIST Node 2 #-}
 
 checkn :: Nat -> Nat -> Tree -> Result
-checkn i n t = (ordered t && (depth t <= i) && (depthNat t <= s30))
-                                      ==> ordered (del n t)
+checkn i n t = sized (ordered t ==> ordered (del n t))
+                     (depth t <= i)
 
 check :: Nat -> Tree -> Result
 check n t = checkn s5 n t
 
+checkBasic :: Nat -> Tree -> Result
+checkBasic n t = ordered t ==> ordered (del n t)
 
 genn :: Nat -> Tree -> Bool
 genn i t = ordered t && (depth t <= i) && (depthNat t <= s2)
 
 enumCheckn :: Nat -> Tree -> Result
-enumCheckn i t = (ordered t && (depth t <= i) && (depthNat t <= s3))
-                                      ==> True
+enumCheckn i t
+  = sized (ordered t ==> ordered (del (S Z) t))
+          ((countTree t <= i) && (depthNat t <= s4))
 
 enumBalancedn :: Nat -> Tree -> Result
 enumBalancedn i t = (ordered t && balancedTree i t && (depthNat t < s6))
                                       ==> True
+
+countTree :: Tree -> Nat
+countTree Leaf = Z
+countTree (Node t1 a t2) = S (countTree t1 + countTree t2)
 
 depthNat :: Tree -> Nat
 depthNat Leaf = Z

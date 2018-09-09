@@ -7,8 +7,8 @@ import OverlapPrelude
 
 data Expr = Add Expr Expr
           | If Expr Expr Expr
-          | N Nat 
-          | B Bool 
+          | Natural Nat 
+          | Boolean Bool 
 
 {-# DIST Add 3 #-}
 {-# DIST If 3 #-}
@@ -19,13 +19,23 @@ data Type = TypeN | TypeB | NoType
 check :: Type -> Expr -> Result 
 check t e = checkn s7 t e 
 
-checkn :: Nat -> Type -> Expr -> Result 
-checkn n t e = oftype e t && (depthExpr e <= n) ==> noError (evalExpr e)
+checkn :: Nat -> Type -> Expr -> Result
+checkn n t e = sized (oftype e t ==> noError (evalExpr e)) (depthExpr e <= n)
 
+enumcheckn :: Nat -> Type -> Expr -> Result
+enumcheckn n t e = sized
+  (oftype e t ==> noError (evalExpr e))
+  (countExpr e <= n)
+
+countExpr :: Expr -> Nat
+countExpr (Natural v) = v
+countExpr (Boolean v) = Z
+countExpr (If e e' e'') = S (countExpr e + countExpr e' + countExpr e'')
+countExpr (Add e e') = S (countExpr e + countExpr e')
 
 depthExpr :: Expr -> Nat
-depthExpr (N v) = Z
-depthExpr (B v) = Z
+depthExpr (Natural v) = v
+depthExpr (Boolean v) = Z
 depthExpr (If e e' e'') = S (max (depthExpr e) (max (depthExpr e') (depthExpr e'')))
 depthExpr (Add e e') = S (max (depthExpr e) (depthExpr e'))
 
@@ -34,8 +44,8 @@ welltyped NoType = False
 welltyped x = True 
 
 typeof :: Expr -> Type 
-typeof (N v) = TypeN 
-typeof (B v) = TypeB
+typeof (Natural v) = TypeN 
+typeof (Boolean v) = TypeB
 typeof (If e e' e'') = typeIf (typeof e) (typeof e') (typeof e'') 
 typeof (Add e e') = typeAdd (typeof e) (typeof e')
 
@@ -46,8 +56,8 @@ typeIf u v w = NoType
 typeAdd TypeN TypeN = TypeN
 typeAdd u v = NoType
 
-oftype (N u) TypeN = True
-oftype (B v) TypeB = True
+oftype (Natural u) TypeN = True
+oftype (Boolean v) TypeB = True
 oftype (If e e' e'') t =  oftype e TypeB *&&* oftype e' t *&&* oftype e'' t
 oftype (Add e e') TypeN =  oftype e TypeN *&&* oftype e' TypeN
 oftype u v = False
@@ -62,9 +72,9 @@ noError ResError = False
 noError u = True
 
 evalExpr :: Expr -> ExprRes
-evalExpr (N n) = ResN n
-evalExpr (B b) = ResB b
---evalExpr (Add (N v) e') = ResB True
+evalExpr (Natural n) = ResN n
+evalExpr (Boolean b) = ResB b
+--evalExpr (Add (Natural v) e') = ResB True
 evalExpr (Add e e') = evalAdd (evalExpr e) (evalExpr e')
 evalExpr (If e e' e'') = evalIf (evalExpr e) (evalExpr e') (evalExpr e'')
 

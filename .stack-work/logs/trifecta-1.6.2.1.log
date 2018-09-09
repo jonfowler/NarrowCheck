@@ -1,0 +1,27 @@
+[1 of 2] Compiling Main             ( /tmp/stack2484/trifecta-1.6.2.1/Setup.lhs, /tmp/stack2484/trifecta-1.6.2.1/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/setup/Main.o )
+
+/tmp/stack2484/trifecta-1.6.2.1/Setup.lhs:40:69: warning: [-Wdeprecations]
+    In the use of type constructor or class ‘InstalledPackageId’
+    (imported from Distribution.Package):
+    Deprecated: "Use UnitId instead"
+[2 of 2] Compiling StackSetupShim   ( /home/jon/.stack/setup-exe-src/setup-shim-mPHDZzAJ.hs, /tmp/stack2484/trifecta-1.6.2.1/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/setup/StackSetupShim.o )
+Linking /tmp/stack2484/trifecta-1.6.2.1/.stack-work/dist/x86_64-linux/Cabal-1.24.2.0/setup/setup ...
+Configuring trifecta-1.6.2.1...
+Building trifecta-1.6.2.1...
+Preprocessing library trifecta-1.6.2.1...
+[ 1 of 13] Compiling Text.Trifecta.Util.IntervalMap ( src/Text/Trifecta/Util/IntervalMap.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Util/IntervalMap.o )
+[ 2 of 13] Compiling Text.Trifecta.Util.Combinators ( src/Text/Trifecta/Util/Combinators.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Util/Combinators.o )
+[ 3 of 13] Compiling Text.Trifecta.Util.Array ( src/Text/Trifecta/Util/Array.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Util/Array.o )
+[ 4 of 13] Compiling Text.Trifecta.Instances ( src/Text/Trifecta/Instances.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Instances.o )
+[ 5 of 13] Compiling Text.Trifecta.Delta ( src/Text/Trifecta/Delta.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Delta.o )
+[ 6 of 13] Compiling Text.Trifecta.Rendering ( src/Text/Trifecta/Rendering.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Rendering.o )
+[ 7 of 13] Compiling Text.Trifecta.Result ( src/Text/Trifecta/Result.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Result.o )
+[ 8 of 13] Compiling Text.Trifecta.Rope ( src/Text/Trifecta/Rope.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Rope.o )
+[ 9 of 13] Compiling Text.Trifecta.Highlight ( src/Text/Trifecta/Highlight.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Highlight.o )
+[10 of 13] Compiling Text.Trifecta.Util.It ( src/Text/Trifecta/Util/It.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Util/It.o )
+[11 of 13] Compiling Text.Trifecta.Combinators ( src/Text/Trifecta/Combinators.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Combinators.o )
+[12 of 13] Compiling Text.Trifecta.Parser ( src/Text/Trifecta/Parser.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta/Parser.o )
+[13 of 13] Compiling Text.Trifecta    ( src/Text/Trifecta.hs, .stack-work/dist/x86_64-linux/Cabal-1.24.2.0/build/Text/Trifecta.o )
+Installing library in
+/home/jon/.stack/snapshots/x86_64-linux/lts-9.11/8.0.2/lib/x86_64-linux-ghc-8.0.2/trifecta-1.6.2.1-30bUsSKFOVFC8HQWTvCtiC
+Registering trifecta-1.6.2.1...
