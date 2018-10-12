@@ -7,8 +7,8 @@ import OverlapPrelude
 -- (With invariants coded, and a fault injected.)
 
 
-check :: Nat -> Nat -> Tree -> Result 
-check k a t = redBlackN k t && (k <= s3) ==> True -- redBlack (insert a t)
+check :: Nat -> Nat -> Tree -> Result
+check k a t = redBlackN k t ==> redBlack (insert a t)
 
 checkn :: Nat -> Nat -> Nat -> Tree -> Result 
 checkn n k a t = sized (redBlackN k t ==> redBlack (insert a t))
@@ -17,7 +17,7 @@ checkn n k a t = sized (redBlackN k t ==> redBlack (insert a t))
 enumcheckn :: Nat -> Nat -> Tree -> Nat -> Result
 enumcheckn n k t a
   = sized (redBlackN k t  ==> redBlack (insert a t))
-          ((countReds t + (s2 ^ k)) <= n && allLE s2 t && (a <= n))
+          ((countReds t + (s2 ^ k)) <= n && allLE n t && (a <= n))
 
 benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
@@ -35,7 +35,7 @@ data Colour = R | B
 data Tree = L | N Colour Tree Nat Tree
 
 {-# DIST L 1 #-}
-{-# DIST N 3 #-}
+{-# DIST N 2 #-}
 -- Methods
 
 member x L = False

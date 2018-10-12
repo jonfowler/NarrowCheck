@@ -10,9 +10,6 @@ data Expr = Add Expr Expr
           | Natural Nat 
           | Boolean Bool 
 
-{-# DIST Add 3 #-}
-{-# DIST If 3 #-}
-
 data Type = TypeN | TypeB | NoType
 
 
