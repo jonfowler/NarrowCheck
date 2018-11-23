@@ -1,4 +1,4 @@
-module RedBlack where
+module RedBlackTrad where
 
 import Prelude ()
 import OverlapPrelude
@@ -17,7 +17,7 @@ checkn n k a t = sized (redBlackN k t ==> redBlack (insert a t))
 enumcheckn :: Nat -> Nat -> Tree -> Nat -> Result
 enumcheckn n k t a
   = sized (redBlackN k t  ==> redBlack (insert a t))
-          ((countReds t + (s2 ^ k)) <= n && allLE n t && (a <= n))
+          ((countReds t + pred (s2 ^ k)) <= n && allLE n t && (a <= n))
 
 benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
@@ -39,9 +39,9 @@ data Tree = L | N Colour Tree Nat Tree
 -- Methods
 
 member x L = False
-member x (N col a y b) = if' (x < y) 
+member x (N col a y b) = if' (x < y)
   (member x a)
-  (if' (x > y) 
+  (if' (x > y)
     (member x b)
     True)
 
@@ -50,9 +50,9 @@ makeBlack (N col a y b) = N B a y b
 insert x s = makeBlack (ins x s)
 
 ins x L = N R L x L
-ins x (N col a y b) = if' (x < y) 
+ins x (N col a y b) = if' (x < y)
   (balance col (ins x a) y b)
-  (if' (x > y) 
+  (if' (x > y)
     (balance col a y (ins x b))
     (N col a y b))
 
@@ -76,7 +76,7 @@ blackRoot x = False
 -- INVARIANT 1. No red node has a red parent.
 
 red L = True
-red (N col a x b) = ((isRed col) ===> (blackRoot a *&&* blackRoot b)) 
+red (N col a x b) = ((isRed col) ===> (blackRoot a *&&* blackRoot b))
     *&&* red a *&&* red b
 
 -- INVARIANT 2. Every path from the root to an empty node contains the
@@ -89,7 +89,7 @@ maxBlack (N B t1 x t2) = S (max (maxBlack t1) (maxBlack t2))
 black t = fst (black' t)
 
 black' L = T True Z
-black' (N c t1 x t2) = black'' c (black' t1) (black' t2) 
+black' (N c t1 x t2) = black'' c (black' t1) (black' t2)
 
 black'' R (T b1 m) (T b2 n) = T (b1 *&&* b2 *&&* (m == n)) (max m n)
 black'' B (T b1 m) (T b2 n) = T (b1 *&&* b2 *&&* (m == n)) (S (max m n))

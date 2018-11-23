@@ -17,7 +17,7 @@ checkn n k a t = sized (redBlackN k t ==> redBlack (insert a t))
 enumcheckn :: Nat -> Nat -> Tree -> Nat -> Result
 enumcheckn n k t a
   = sized (redBlackN k t  ==> redBlack (insert a t))
-          ((countReds t + (s2 ^ k)) <= n && allLE n t && (a <= n))
+          ((countReds t + pred (s2 ^ k)) <= n && allLE n t && (a <= n))
 
 benchmarkn :: Nat -> Tree -> Result
 benchmarkn n t = redBlackN n t && (depthNat t == Z) ==> True
